@@ -106,8 +106,8 @@ typedef sptr_t (*SciFnDirect)(sptr_t ptr, unsigned int iMessage, uptr_t wParam, 
 #define SCI_GETIMEINTERACTION 2678
 #define SCI_SETIMEINTERACTION 2679
 // >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-#define SCI_ISIMEOPEN 2722
-#define SCI_ISIMEMODECJK 2723
+#define SCI_ISIMEOPEN 2724
+#define SCI_ISIMEMODECJK 2725
 // <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 #define MARKER_MAX 31
 #define SC_MARK_CIRCLE 0
