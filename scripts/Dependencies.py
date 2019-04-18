@@ -21,7 +21,10 @@
 
 import codecs, glob, os, sys
 
-from . import FileGenerator
+if __name__ == "__main__":
+	import FileGenerator
+else:
+	from . import FileGenerator
 
 continuationLineEnd = " \\"
 
@@ -123,7 +126,7 @@ def TextFromDependencies(dependencies):
 	""" Convert a list of dependencies to text. """
 	text = ""
 	indentHeaders = "\t"
-	joinHeaders = continuationLineEnd + "\n" + indentHeaders
+	joinHeaders = continuationLineEnd + os.linesep + indentHeaders
 	for dep in dependencies:
 		object, headers = dep
 		text += object + ":"
@@ -131,12 +134,13 @@ def TextFromDependencies(dependencies):
 			text += joinHeaders
 			text += header
 		if headers:
-			text += "\n"
+			text += os.linesep
 	return text
 
 def UpdateDependencies(filepath, dependencies, comment=""):
 	""" Write a dependencies file if different from dependencies. """
-	FileGenerator.UpdateFile(filepath, comment+TextFromDependencies(dependencies))
+	FileGenerator.UpdateFile(os.path.abspath(filepath), comment.rstrip() + os.linesep +
+		TextFromDependencies(dependencies))
 
 def WriteDependencies(output, dependencies):
 	""" Write a list of dependencies out to a stream. """

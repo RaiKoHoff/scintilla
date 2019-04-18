@@ -161,8 +161,8 @@ ScintillaGTKAccessible *ScintillaGTKAccessible::FromAccessible(GtkAccessible *ac
 ScintillaGTKAccessible::ScintillaGTKAccessible(GtkAccessible *accessible_, GtkWidget *widget_) :
 		accessible(accessible_),
 		sci(ScintillaGTK::FromWidget(widget_)),
-		deletionLengthChar(0),
 		old_pos(-1) {
+	SetAccessibility(true);
 	g_signal_connect(widget_, "sci-notify", G_CALLBACK(SciNotify), this);
 }
 
@@ -866,10 +866,12 @@ void ScintillaGTKAccessible::NotifyReadOnly() {
 #endif
 }
 
-void ScintillaGTKAccessible::SetAccessibility() {
+void ScintillaGTKAccessible::SetAccessibility(bool enabled) {
 	// Called by ScintillaGTK when application has enabled or disabled accessibility
-	character_offsets.resize(0);
-	character_offsets.push_back(0);
+	if (enabled)
+		sci->pdoc->AllocateLineCharacterIndex(SC_LINECHARACTERINDEX_UTF32);
+	else
+		sci->pdoc->ReleaseLineCharacterIndex(SC_LINECHARACTERINDEX_UTF32);
 }
 
 void ScintillaGTKAccessible::Notify(GtkWidget *, gint, SCNotification *nt) {
@@ -877,13 +879,6 @@ void ScintillaGTKAccessible::Notify(GtkWidget *, gint, SCNotification *nt) {
 		return;
 	switch (nt->nmhdr.code) {
 		case SCN_MODIFIED: {
-			if (nt->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) {
-				// invalidate character offset cache if applicable
-				const Sci::Line line = sci->pdoc->LineFromPosition(nt->position);
-				if (character_offsets.size() > static_cast<size_t>(line + 1)) {
-					character_offsets.resize(line + 1);
-				}
-			}
 			if (nt->modificationType & SC_MOD_INSERTTEXT) {
 				int startChar = CharacterOffsetFromByteOffset(nt->position);
 				int lengthChar = sci->pdoc->CountCharacters(nt->position, nt->position + nt->length);
@@ -891,14 +886,11 @@ void ScintillaGTKAccessible::Notify(GtkWidget *, gint, SCNotification *nt) {
 				UpdateCursor();
 			}
 			if (nt->modificationType & SC_MOD_BEFOREDELETE) {
-				// We cannot compute the deletion length in DELETETEXT as it requires accessing the
-				// buffer, so that the character are still present.  So, we cache the value here,
-				// and use it in DELETETEXT that fires quickly after.
-				deletionLengthChar = sci->pdoc->CountCharacters(nt->position, nt->position + nt->length);
+				int startChar = CharacterOffsetFromByteOffset(nt->position);
+				int lengthChar = sci->pdoc->CountCharacters(nt->position, nt->position + nt->length);
+				g_signal_emit_by_name(accessible, "text-changed::delete", startChar, lengthChar);
 			}
 			if (nt->modificationType & SC_MOD_DELETETEXT) {
-				int startChar = CharacterOffsetFromByteOffset(nt->position);
-				g_signal_emit_by_name(accessible, "text-changed::delete", startChar, deletionLengthChar);
 				UpdateCursor();
 			}
 			if (nt->modificationType & SC_MOD_CHANGESTYLE) {
