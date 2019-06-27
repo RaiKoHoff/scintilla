@@ -325,7 +325,7 @@ public:
 			return LinePPState();
 		}
 	}
-	void Add(Sci_Position line, const LinePPState& lls) {
+	void Add(Sci_Position line, LinePPState lls) {
 		vlls.resize(line+1);
 		vlls[line] = lls;
 	}

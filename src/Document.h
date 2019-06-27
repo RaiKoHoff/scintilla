@@ -8,11 +8,6 @@
 #ifndef DOCUMENT_H
 #define DOCUMENT_H
 
-// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-#include "ILoader.h"
-#include "CharacterCategory.h"
-// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
-
 namespace Scintilla {
 
 class DocWatcher;

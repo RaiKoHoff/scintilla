@@ -415,7 +415,7 @@ static NSCursor *cursorFromEnum(Window::Cursor cursor) {
 	}
 
 	[mOwner message: SCI_SETTARGETRANGE wParam: posRange.location lParam: NSMaxRange(posRange)];
-	std::string text([mOwner message: SCI_TARGETASUTF8] + 1, 0);
+	std::string text([mOwner message: SCI_TARGETASUTF8], 0);
 	[mOwner message: SCI_TARGETASUTF8 wParam: 0 lParam: reinterpret_cast<sptr_t>(&text[0])];
 	text = FixInvalidUTF8(text);
 	NSString *result = @(text.c_str());
@@ -425,12 +425,14 @@ static NSCursor *cursorFromEnum(Window::Cursor cursor) {
 	// SCI_GETSTYLEAT reports a signed byte but want an unsigned to index into styles
 	const char styleByte = static_cast<char>([mOwner message: SCI_GETSTYLEAT wParam: posRange.location]);
 	const long style = static_cast<unsigned char>(styleByte);
-	std::string fontName([mOwner message: SCI_STYLEGETFONT wParam: style lParam: 0] + 1, 0);
+	std::string fontName([mOwner message: SCI_STYLEGETFONT wParam: style lParam: 0], 0);
 	[mOwner message: SCI_STYLEGETFONT wParam: style lParam: (sptr_t)&fontName[0]];
 	const CGFloat fontSize = [mOwner message: SCI_STYLEGETSIZEFRACTIONAL wParam: style] / 100.0f;
 	NSString *sFontName = @(fontName.c_str());
 	NSFont *font = [NSFont fontWithName: sFontName size: fontSize];
-	[asResult addAttribute: NSFontAttributeName value: font range: rangeAS];
+	if (font) {
+		[asResult addAttribute: NSFontAttributeName value: font range: rangeAS];
+	}
 
 	return asResult;
 }
@@ -624,7 +626,7 @@ static NSCursor *cursorFromEnum(Window::Cursor cursor) {
 		posRangeCurrent.length = lengthInserted;
 		mMarkedTextRange = mOwner.backend->CharactersFromPositions(posRangeCurrent);
 		// Mark the just inserted text. Keep the marked range for later reset.
-		[mOwner setGeneralProperty: SCI_SETINDICATORCURRENT value: INDIC_IME];
+		[mOwner setGeneralProperty: SCI_SETINDICATORCURRENT value: INDICATOR_IME];
 		[mOwner setGeneralProperty: SCI_INDICATORFILLRANGE
 				 parameter: posRangeCurrent.location
 				     value: posRangeCurrent.length];
@@ -1374,11 +1376,11 @@ static NSCursor *cursorFromEnum(Window::Cursor cursor) {
  * input composition, depending on language, keyboard etc.
  */
 - (void) updateIndicatorIME {
-	[self setColorProperty: SCI_INDICSETFORE parameter: INDIC_IME fromHTML: @"#FF0000"];
+	[self setColorProperty: SCI_INDICSETFORE parameter: INDICATOR_IME fromHTML: @"#FF0000"];
 	const bool drawInBackground = [self message: SCI_GETPHASESDRAW] != 0;
-	[self setGeneralProperty: SCI_INDICSETUNDER parameter: INDIC_IME value: drawInBackground];
-	[self setGeneralProperty: SCI_INDICSETSTYLE parameter: INDIC_IME value: INDIC_PLAIN];
-	[self setGeneralProperty: SCI_INDICSETALPHA parameter: INDIC_IME value: 100];
+	[self setGeneralProperty: SCI_INDICSETUNDER parameter: INDICATOR_IME value: drawInBackground];
+	[self setGeneralProperty: SCI_INDICSETSTYLE parameter: INDICATOR_IME value: INDIC_PLAIN];
+	[self setGeneralProperty: SCI_INDICSETALPHA parameter: INDICATOR_IME value: 100];
 }
 
 //--------------------------------------------------------------------------------------------------

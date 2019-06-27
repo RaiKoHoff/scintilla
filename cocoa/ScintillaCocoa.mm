@@ -1409,7 +1409,7 @@ void ScintillaCocoa::StartDrag() {
 	//           the full rectangle which may include non-selected text.
 
 	NSBitmapImageRep *bitmap = NULL;
-	CGImageRef imagePixmap = pixmap.GetImage();
+	CGImageRef imagePixmap = pixmap.CreateImage();
 	if (imagePixmap)
 		bitmap = [[NSBitmapImageRep alloc] initWithCGImage: imagePixmap];
 	CGImageRelease(imagePixmap);
@@ -2176,25 +2176,38 @@ bool ScintillaCocoa::KeyboardInput(NSEvent *event) {
  * Used to insert already processed text provided by the Cocoa text input system.
  */
 ptrdiff_t ScintillaCocoa::InsertText(NSString *input) {
-	CFStringEncoding encoding = EncodingFromCharacterSet(IsUnicodeMode(),
-				    vs.styles[STYLE_DEFAULT].characterSet);
-	std::string encoded = EncodedBytesString((__bridge CFStringRef)input, encoding);
-
-	if (encoded.length() > 0) {
-		if (encoding == kCFStringEncodingUTF8) {
-			// There may be multiple characters in input so loop over them
-			std::string_view sv = encoded;
-			while (sv.length()) {
-				const unsigned char leadByte = sv[0];
-				const unsigned int bytesInCharacter = UTF8BytesOfLead[leadByte];
-				AddCharUTF(sv.data(), bytesInCharacter, false);
-				sv.remove_prefix(bytesInCharacter);
-			}
-		} else {
-			AddCharUTF(encoded.c_str(), static_cast<unsigned int>(encoded.length()), false);
-		}
+	if ([input length] == 0) {
+		return 0;
 	}
-	return encoded.length();
+
+	// There may be multiple characters in input so loop over them
+	if (IsUnicodeMode()) {
+		// There may be non-BMP characters as 2 elements in NSString so
+		// convert to UTF-8 and use UTF8BytesOfLead.
+		std::string encoded = EncodedBytesString((__bridge CFStringRef)input,
+							 kCFStringEncodingUTF8);
+		std::string_view sv = encoded;
+		while (sv.length()) {
+			const unsigned char leadByte = sv[0];
+			const unsigned int bytesInCharacter = UTF8BytesOfLead[leadByte];
+			InsertCharacter(sv.substr(0, bytesInCharacter));
+			sv.remove_prefix(bytesInCharacter);
+		}
+		return encoded.length();
+	} else {
+		const CFStringEncoding encoding = EncodingFromCharacterSet(IsUnicodeMode(),
+									   vs.styles[STYLE_DEFAULT].characterSet);
+		ptrdiff_t lengthInserted = 0;
+		for (NSInteger i = 0; i < [input length]; i++) {
+			NSString *character = [input substringWithRange:NSMakeRange(i, 1)];
+			std::string encoded = EncodedBytesString((__bridge CFStringRef)character,
+								 encoding);
+			lengthInserted += encoded.length();
+			InsertCharacter(encoded);
+		}
+
+		return lengthInserted;
+	}
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -2274,7 +2287,7 @@ void ScintillaCocoa::CompositionStart() {
  */
 void ScintillaCocoa::CompositionCommit() {
 	pdoc->TentativeCommit();
-	pdoc->DecorationSetCurrentIndicator(INDIC_IME);
+	pdoc->DecorationSetCurrentIndicator(INDICATOR_IME);
 	pdoc->DecorationFillRange(0, 0, pdoc->Length());
 }
 

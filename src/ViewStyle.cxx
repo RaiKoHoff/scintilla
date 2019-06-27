@@ -41,12 +41,10 @@ FontRealised::~FontRealised() {
 
 void FontRealised::Realise(Surface &surface, int zoomLevel, int technology, const FontSpecification &fs) {
 	PLATFORM_ASSERT(fs.fontName);
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	//sizeZoomed = fs.size + zoomLevel * SC_FONT_SIZE_MULTIPLIER;
-	//if (sizeZoomed <= 2 * SC_FONT_SIZE_MULTIPLIER)	// Hangs if sizeZoomed <= 1
-	//	sizeZoomed = 2 * SC_FONT_SIZE_MULTIPLIER;
-	sizeZoomed = GetFontSizeZoomed(fs.size, zoomLevel);
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+	sizeZoomed = fs.size + zoomLevel * SC_FONT_SIZE_MULTIPLIER;
+	if (sizeZoomed <= 2 * SC_FONT_SIZE_MULTIPLIER)	// Hangs if sizeZoomed <= 1
+		sizeZoomed = 2 * SC_FONT_SIZE_MULTIPLIER;
+
 	const float deviceHeight = static_cast<float>(surface.DeviceHeightFont(sizeZoomed));
 	const FontParameters fp(fs.fontName, deviceHeight / SC_FONT_SIZE_MULTIPLIER, fs.weight, fs.italic, fs.extraFontFlag, technology, fs.characterSet);
 	font.Create(fp);
@@ -58,13 +56,13 @@ void FontRealised::Realise(Surface &surface, int zoomLevel, int technology, cons
 	spaceWidth = surface.WidthText(font, " ");
 }
 
-ViewStyle::ViewStyle() : markers(MARKER_MAX + 1), indicators(INDIC_MAX + 1) {
+ViewStyle::ViewStyle() : markers(MARKER_MAX + 1), indicators(INDICATOR_MAX + 1) {
 	Init();
 }
 
 // Copy constructor only called when printing copies the screen ViewStyle so it can be
 // modified for printing styles.
-ViewStyle::ViewStyle(const ViewStyle &source) : markers(MARKER_MAX + 1), indicators(INDIC_MAX + 1), fonts() {
+ViewStyle::ViewStyle(const ViewStyle &source) : markers(MARKER_MAX + 1), indicators(INDICATOR_MAX + 1) {
 	Init(source.styles.size());
 	styles = source.styles;
 	for (size_t sty=0; sty<source.styles.size(); sty++) {
@@ -252,7 +250,7 @@ void ViewStyle::Init(size_t stylesSize_) {
 	marginInside = true;
 	CalculateMarginWidthAndMask();
 	textStart = marginInside ? fixedColumnWidth : leftMarginWidth;
-	zoomLevel = 100;  /// @ 20018-09-06 Changed to percent
+	zoomLevel = 0;
 	viewWhitespace = wsInvisible;
 	tabDrawMode = tdLongArrow;
 	whitespaceSize = 1;
@@ -548,7 +546,16 @@ bool ViewStyle::SetWrapIndentMode(int wrapIndentMode_) noexcept {
 }
 
 bool ViewStyle::IsBlockCaretStyle() const noexcept {
-	return (caretStyle == CARETSTYLE_BLOCK) || (caretStyle & CARETSTYLE_OVERSTRIKE_BLOCK) != 0;
+	return ((caretStyle & CARETSTYLE_INS_MASK) == CARETSTYLE_BLOCK) ||
+		(caretStyle & CARETSTYLE_OVERSTRIKE_BLOCK) != 0;
+}
+
+bool ViewStyle::DrawCaretInsideSelection(bool inOverstrike, bool imeCaretBlockOverride) const noexcept {
+	if (caretStyle & CARETSTYLE_BLOCK_AFTER)
+		return false;
+	return ((caretStyle & CARETSTYLE_INS_MASK) == CARETSTYLE_BLOCK) ||
+		(inOverstrike && (caretStyle & CARETSTYLE_OVERSTRIKE_BLOCK) != 0) ||
+		imeCaretBlockOverride;
 }
 
 ViewStyle::CaretShape ViewStyle::CaretShapeForMode(bool inOverstrike) const noexcept {
@@ -559,46 +566,6 @@ ViewStyle::CaretShape ViewStyle::CaretShapeForMode(bool inOverstrike) const noex
 	const int caret = caretStyle & CARETSTYLE_INS_MASK;
 	return (caret <= CARETSTYLE_BLOCK) ? static_cast<CaretShape>(caret) : CaretShape::line;
 }
-
-// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-
-bool ViewStyle::ZoomIn() noexcept {
-	if (zoomLevel < SC_MAX_ZOOM_LEVEL) {
-		int level = zoomLevel;
-		if (level < 200) {
-			level += 10;
-		} else {
-			level += 25;
-		}
-
-		level = std::min(level, SC_MAX_ZOOM_LEVEL);
-		if (level != zoomLevel) {
-			zoomLevel = level;
-			return true;
-		}
-	}
-	return false;
-}
-
-bool ViewStyle::ZoomOut() noexcept {
-	if (zoomLevel > SC_MIN_ZOOM_LEVEL) {
-		int level = zoomLevel;
-		if (level <= 200) {
-			level -= 10;
-		} else {
-			level -= 25;
-		}
-
-		level = std::max(level, SC_MIN_ZOOM_LEVEL);
-		if (level != zoomLevel) {
-			zoomLevel = level;
-			return true;
-		}
-	}
-	return false;
-}
-
-// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 void ViewStyle::AllocStyles(size_t sizeNew) {
 	size_t i=styles.size();

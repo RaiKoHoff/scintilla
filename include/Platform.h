@@ -76,12 +76,6 @@
 
 #endif
 
-// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-#include <memory>
-#include <vector>
-#include <string_view>
-// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
-
 namespace Scintilla {
 
 typedef float XYPOSITION;

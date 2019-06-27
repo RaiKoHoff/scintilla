@@ -41,14 +41,13 @@ static inline bool AtEOL(Accessor &styler, Sci_PositionU i) {
 // Tests for BATCH Operators
 static bool IsBOperator(char ch) {
 	return (ch == '=') || (ch == '+') || (ch == '>') || (ch == '<') ||
-		(ch == '|') || (ch == '?') || (ch == '*') || 
-    (ch == '(') || (ch == ')') || (ch == '[') || (ch == ']');
+		(ch == '|') || (ch == '?') || (ch == '*');
 }
 
 // Tests for BATCH Separators
 static bool IsBSeparator(char ch) {
 	return (ch == '\\') || (ch == '.') || (ch == ';') ||
-		(ch == '\"') || (ch == '\'') || (ch == '/') || (ch == '&') || (ch == '|');
+		(ch == '\"') || (ch == '\'') || (ch == '/');
 }
 
 static void ColouriseBatchLine(
@@ -132,8 +131,9 @@ static void ColouriseBatchLine(
 		}
 		wordBuffer[wbl] = '\0';
 		wbo = 0;
+
 		// Check for Comment - return if found
-		if ((CompareCaseInsensitive(wordBuffer, "rem") == 0) && (continueProcessing)) {
+		if (CompareCaseInsensitive(wordBuffer, "rem") == 0) {
 			styler.ColourTo(endPos, SCE_BAT_COMMENT);
 			return;
 		}
@@ -141,9 +141,9 @@ static void ColouriseBatchLine(
 		if (IsBSeparator(wordBuffer[0])) {
 			// Check for External Command / Program
 			if ((cmdLoc == offset - wbl) &&
-        ((wordBuffer[0] == ':') ||
-        (wordBuffer[0] == '\\') ||
-          (wordBuffer[0] == '.'))) {
+				((wordBuffer[0] == ':') ||
+				(wordBuffer[0] == '\\') ||
+				(wordBuffer[0] == '.'))) {
 				// Reset Offset to re-process remainder of word
 				offset -= (wbl - 1);
 				// Colorize External Command / Program
@@ -163,7 +163,8 @@ static void ColouriseBatchLine(
 				styler.ColourTo(startLine + offset - 1, SCE_BAT_DEFAULT);
 			}
 		// Check for Regular Keyword in list
-		} else if ((keywords.InList(wordBuffer)) && (continueProcessing)) {
+		} else if ((keywords.InList(wordBuffer)) &&
+			(continueProcessing)) {
 			// ECHO, GOTO, PROMPT and SET require no further Regular Keyword Checking
 			if ((CompareCaseInsensitive(wordBuffer, "echo") == 0) ||
 				(CompareCaseInsensitive(wordBuffer, "goto") == 0) ||
@@ -210,7 +211,8 @@ static void ColouriseBatchLine(
 		// Check for Special Keyword in list, External Command / Program, or Default Text
 		} else if ((wordBuffer[0] != '%') &&
 				   (wordBuffer[0] != '!') &&
-			(!IsBOperator(wordBuffer[0])) && (continueProcessing)) {
+			(!IsBOperator(wordBuffer[0])) &&
+			(continueProcessing)) {
 			// Check for Special Keyword
 			//     Affected Commands are in Length range 2-6
 			//     Good that ERRORLEVEL, EXIST, CALL, DO, LOADHIGH, and LH are unaffected
@@ -452,7 +454,6 @@ static void ColouriseBatchLine(
 		while ((offset < lengthLine) && (isspacechar(lineBuffer[offset]))) {
 			offset++;
 		}
- 
 	}
 	// Colorize Default Text for remainder of line - currently not lexed
 	styler.ColourTo(endPos, SCE_BAT_DEFAULT);
