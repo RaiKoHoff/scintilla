@@ -504,6 +504,8 @@ void ScintillaBase::CallTipClick() {
 	NotifyParent(scn);
 }
 
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+#if 0
 bool ScintillaBase::ShouldDisplayPopup(Point ptInWindowCoordinates) const {
 	return (displayPopupMenu == SC_POPUP_ALL ||
 		(displayPopupMenu == SC_POPUP_TEXT && !PointInSelMargin(ptInWindowCoordinates)));
@@ -525,6 +527,8 @@ void ScintillaBase::ContextMenu(Point pt) {
 		popup.Show(pt, wMain);
 	}
 }
+#endif
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 void ScintillaBase::CancelModes() {
 	AutoCompleteCancel();
