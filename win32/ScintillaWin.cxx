@@ -459,7 +459,7 @@ class ScintillaWin :
 		invalidTimerID, standardTimerID, idleTimerID, fineTimerStart
 	};
 
-	bool SCICALL DragThreshold(Point ptStart, Point ptNow) noexcept override;
+	bool DragThreshold(Point ptStart, Point ptNow) noexcept override;
 	void StartDrag() override;
 	static int MouseModifiers(uptr_t wParam) noexcept;
 
@@ -518,7 +518,7 @@ class ScintillaWin :
 	void CopyAllowLine() override;
 	bool CanPaste() override;
 	void Paste(bool asBinary) override;
-	void SCICALL CreateCallTipWindow(PRectangle rc) noexcept override;
+	void CreateCallTipWindow(PRectangle rc) noexcept override;
 #if SCI_EnablePopupMenu
 	void AddToPopUp(const char *label, int cmd = 0, bool enabled = true) noexcept override;
 #endif
@@ -820,8 +820,8 @@ bool ScintillaWin::DragThreshold(Point ptStart, Point ptNow) noexcept {
 	const Point ptDifference = ptStart - ptNow;
 	const XYPOSITION xMove = std::trunc(std::abs(ptDifference.x));
 	const XYPOSITION yMove = std::trunc(std::abs(ptDifference.y));
-	return (xMove > GetSystemMetricsEx(SM_CXDRAG)) ||
-		(yMove > GetSystemMetricsEx(SM_CYDRAG));
+	return (xMove > GetSystemMetricsDPIScaledX(MainHWND(), SM_CXDRAG)) ||
+	       (yMove > GetSystemMetricsDPIScaledY(MainHWND(), SM_CYDRAG));
 }
 
 void ScintillaWin::StartDrag() {
@@ -1021,6 +1021,7 @@ Sci::Position ScintillaWin::EncodedFromUTF8(const char *utf8, char *encoded) con
 }
 
 bool ScintillaWin::PaintDC(HDC hdc) {
+
 	if (technology == SC_TECHNOLOGY_DEFAULT) {
 		AutoSurface surfaceWindow(hdc, this);
 		if (surfaceWindow) {
@@ -1051,6 +1052,10 @@ bool ScintillaWin::PaintDC(HDC hdc) {
 
 sptr_t ScintillaWin::WndPaint() {
 	//ElapsedPeriod ep;
+	
+	// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+	if (paintState != notPainting) { return 0; } // prevent recursion loop
+	// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 	// Redirect assertions to debug output and save current state
 	const bool assertsPopup = Platform::ShowAssertionPopUps(false);
@@ -1066,8 +1071,8 @@ sptr_t ScintillaWin::WndPaint() {
 	const PRectangle rcClient = GetClientRectangle();
 	paintingAllText = BoundsContains(rcPaint, hRgnUpdate, rcClient);
 	if (!PaintDC(ps.hdc)) {
-				paintState = paintAbandoned;
-			}
+		paintState = paintAbandoned;
+	}
 	if (hRgnUpdate) {
 		::DeleteRgn(hRgnUpdate);
 		hRgnUpdate = {};
