@@ -117,6 +117,13 @@ Used by VSCode, Atom etc.
 #define WM_UNICHAR                      0x0109
 #endif
 
+#ifndef WM_DPICHANGED
+#define WM_DPICHANGED 0x02E0
+#endif
+#ifndef WM_DPICHANGED_AFTERPARENT
+#define WM_DPICHANGED_AFTERPARENT 0x02E3
+#endif
+
 #ifndef UNICODE_NOCHAR
 #define UNICODE_NOCHAR                  0xFFFF
 #endif
@@ -379,11 +386,19 @@ public:
 class GlobalMemory;
 
 class ReverseArrowCursor {
+<<<<<<< .merge_file_a18964
 	DPI_T dpi = { USER_DEFAULT_SCREEN_DPI, USER_DEFAULT_SCREEN_DPI };
 	HCURSOR cursor {};
 
 public:
 	ReverseArrowCursor() noexcept = default;
+=======
+	UINT dpi = USER_DEFAULT_SCREEN_DPI;
+	HCURSOR cursor {};
+
+public:
+	ReverseArrowCursor() noexcept {}
+>>>>>>> .merge_file_a04612
 	// Deleted so ReverseArrowCursor objects can not be copied.
 	ReverseArrowCursor(const ReverseArrowCursor &) = delete;
 	ReverseArrowCursor(ReverseArrowCursor &&) = delete;
@@ -395,9 +410,15 @@ public:
 		}
 	}
 
+<<<<<<< .merge_file_a18964
 	HCURSOR Load(DPI_T dpi_) noexcept {
 		if (cursor)	 {
 			if ((dpi.x == dpi_.x) && (dpi.y == dpi_.y)) {
+=======
+	HCURSOR Load(UINT dpi_) noexcept {
+		if (cursor)	 {
+			if (dpi == dpi_) {
+>>>>>>> .merge_file_a04612
 				return cursor;
 			}
 			::DestroyCursor(cursor);
@@ -428,7 +449,11 @@ class ScintillaWin :
 	unsigned int linesPerScroll;	///< Intellimouse support
 	int wheelDelta; ///< Wheel delta from roll
 
+<<<<<<< .merge_file_a18964
 	DPI_T dpi = { USER_DEFAULT_SCREEN_DPI, USER_DEFAULT_SCREEN_DPI };
+=======
+	UINT dpi = USER_DEFAULT_SCREEN_DPI;
+>>>>>>> .merge_file_a04612
 	ReverseArrowCursor reverseArrowCursor;
 
 	HRGN hRgnUpdate;
@@ -497,8 +522,13 @@ class ScintillaWin :
 		invalidTimerID, standardTimerID, idleTimerID, fineTimerStart
 	};
 
+<<<<<<< .merge_file_a18964
 	void DisplayCursor(Window::Cursor c) noexcept override;
 	bool DragThreshold(Point ptStart, Point ptNow) noexcept override;
+=======
+	void DisplayCursor(Window::Cursor c) override;
+	bool DragThreshold(Point ptStart, Point ptNow) override;
+>>>>>>> .merge_file_a04612
 	void StartDrag() override;
 	static int MouseModifiers(uptr_t wParam) noexcept;
 
@@ -516,7 +546,7 @@ class ScintillaWin :
 	DWORD GetIMEInputMode();
 // <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	void MoveImeCarets(Sci::Position offset);
-	void DrawImeIndicator(int indicator, int len);
+	void DrawImeIndicator(int indicator, Sci::Position len);
 	void SetCandidateWindowPos();
 	void SelectionToHangul();
 	void EscapeHanja();
@@ -553,6 +583,7 @@ class ScintillaWin :
 	void NotifyURIDropped(const char *list) noexcept;
 	CaseFolder *CaseFolderForEncoding() override;
 	std::string CaseMapString(const std::string &s, int caseMapping) override;
+<<<<<<< .merge_file_a18964
 	void Copy(bool asBinary) override;
 	void CopyAllowLine() override;
 	bool CanPaste()  noexcept override;
@@ -573,6 +604,14 @@ class ScintillaWin :
 		Ansi,		// used in Drag & Drop for CF_TEXT
 		Binary,		// used in Copy & Paste for asBinary
 	};
+=======
+	void Copy() override;
+	bool CanPaste() override;
+	void Paste() override;
+	void CreateCallTipWindow(PRectangle rc) override;
+	void AddToPopUp(const char *label, int cmd = 0, bool enabled = true) override;
+	void ClaimSelection() override;
+>>>>>>> .merge_file_a04612
 
 	void GetIntelliMouseParameters() noexcept;
 	void CopyToGlobal(GlobalMemory &gmUnicode, const SelectionText &selectedText, CopyEncoding encoding);
@@ -668,7 +707,11 @@ ScintillaWin::ScintillaWin(HWND hwnd) {
 	linesPerScroll = 0;
 	wheelDelta = 0;   // Wheel delta from roll
 
+<<<<<<< .merge_file_a18964
 	dpi = GetWindowDPI(hwnd);
+=======
+	dpi = DpiForWindow(hwnd);
+>>>>>>> .merge_file_a04612
 
 	hRgnUpdate = {};
 
@@ -738,10 +781,15 @@ void ScintillaWin::Init() noexcept {
 	//hrOle = ::OleInitialize(nullptr);
 
 	// Find SetCoalescableTimer which is only available from Windows 8+
+<<<<<<< .merge_file_a18964
 #if _WIN32_WINNT < _WIN32_WINNT_WIN8
 	SetCoalescableTimerFn = reinterpret_cast<SetCoalescableTimerSig>(
 		::GetProcAddress(::GetModuleHandle(L"user32.dll"), "SetCoalescableTimer"));
 #endif
+=======
+	HMODULE user32 = ::GetModuleHandleW(L"user32.dll");
+	SetCoalescableTimerFn = DLLFunction<SetCoalescableTimerSig>(user32, "SetCoalescableTimer");
+>>>>>>> .merge_file_a04612
 
 	vs.indicators[SC_INDICATOR_UNKNOWN] = Indicator(INDIC_HIDDEN, ColourDesired(0, 0, 0xff));
 	vs.indicators[SC_INDICATOR_INPUT] = Indicator(INDIC_DOTS, ColourDesired(0, 0, 0xff));
@@ -857,7 +905,11 @@ HWND ScintillaWin::MainHWND() const noexcept {
 	return HwndFromWindow(wMain);
 }
 
+<<<<<<< .merge_file_a18964
 void ScintillaWin::DisplayCursor(Window::Cursor c) noexcept {
+=======
+void ScintillaWin::DisplayCursor(Window::Cursor c) {
+>>>>>>> .merge_file_a04612
 	if (cursorMode != SC_CURSORNORMAL) {
 		c = static_cast<Window::Cursor>(cursorMode);
 	}
@@ -868,12 +920,21 @@ void ScintillaWin::DisplayCursor(Window::Cursor c) noexcept {
 	}
 }
 
+<<<<<<< .merge_file_a18964
 bool ScintillaWin::DragThreshold(Point ptStart, Point ptNow) noexcept {
 	const Point ptDifference = ptStart - ptNow;
 	const XYPOSITION xMove = std::trunc(std::abs(ptDifference.x));
 	const XYPOSITION yMove = std::trunc(std::abs(ptDifference.y));
 	return (xMove > SystemMetricsForDpi(SM_CXDRAG, dpi.x)) ||
 		   (yMove > SystemMetricsForDpi(SM_CYDRAG, dpi.y));
+=======
+bool ScintillaWin::DragThreshold(Point ptStart, Point ptNow) {
+	const Point ptDifference = ptStart - ptNow;
+	const XYPOSITION xMove = std::trunc(std::abs(ptDifference.x));
+	const XYPOSITION yMove = std::trunc(std::abs(ptDifference.y));
+	return (xMove > SystemMetricsForDpi(SM_CXDRAG, dpi)) ||
+		(yMove > SystemMetricsForDpi(SM_CYDRAG, dpi));
+>>>>>>> .merge_file_a04612
 }
 
 void ScintillaWin::StartDrag() {
@@ -1199,7 +1260,7 @@ void ScintillaWin::MoveImeCarets(Sci::Position offset) {
 	}
 }
 
-void ScintillaWin::DrawImeIndicator(int indicator, int len) {
+void ScintillaWin::DrawImeIndicator(int indicator, Sci::Position len) {
 	// Emulate the visual style of IME characters with indicators.
 	// Draw an indicator on the character before caret by the character bytes of len
 	// so it should be called after InsertCharacter().
@@ -1402,7 +1463,11 @@ sptr_t ScintillaWin::HandleCompositionInline(uptr_t, sptr_t lParam) {
 			inBufferCP[size] = '\0';
 			InsertCharacter(std::string_view(inBufferCP, size), CharacterSource::tentativeInput);
 
+<<<<<<< .merge_file_a18964
 			DrawImeIndicator(imeIndicator[i], size);
+=======
+			DrawImeIndicator(imeIndicator[i], docChar.size());
+>>>>>>> .merge_file_a04612
 			i += ucWidth;
 		}
 
@@ -1705,9 +1770,24 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			}
 			break;
 
+<<<<<<< .merge_file_a18964
 		case SC_WORK_IDLE:
 			IdleWork();
 			break;
+=======
+	case WM_UNICHAR:
+		if (wParam == UNICODE_NOCHAR) {
+			return TRUE;
+		} else if (lastKeyDownConsumed) {
+			return 1;
+		} else {
+			wchar_t wcs[3] = { 0 };
+			const size_t wclen = UTF16FromUTF32Character(static_cast<unsigned int>(wParam), wcs);
+			AddWString(std::wstring_view(wcs, wclen), CharacterSource::directInput);
+			return FALSE;
+		}
+	}
+>>>>>>> .merge_file_a04612
 
 		case WM_GETMINMAXINFO:
 			return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
@@ -1748,10 +1828,57 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			MouseLeave();
 			return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
 
+<<<<<<< .merge_file_a18964
 		case WM_LBUTTONUP:
 			ButtonUpWithModifiers(PointFromLParam(lParam),
 				::GetMessageTime(), MouseModifiers(wParam));
 			break;
+=======
+	case WM_IME_COMPOSITION:
+		if (KoreanIME() || imeInteraction == imeInline) {
+			return HandleCompositionInline(wParam, lParam);
+		} else {
+			return HandleCompositionWindowed(wParam, lParam);
+		}
+
+	case WM_IME_SETCONTEXT:
+		if (KoreanIME() || imeInteraction == imeInline) {
+			if (wParam) {
+				LPARAM NoImeWin = lParam;
+				NoImeWin = NoImeWin & (~ISC_SHOWUICOMPOSITIONWINDOW);
+				return ::DefWindowProc(MainHWND(), iMessage, wParam, NoImeWin);
+			}
+		}
+		return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
+
+	case WM_IME_NOTIFY:
+		return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
+
+	}
+	return 0;
+}
+
+sptr_t ScintillaWin::EditMessage(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
+	switch (iMessage) {
+
+	case EM_LINEFROMCHAR:
+		if (static_cast<Sci::Position>(wParam) < 0) {
+			wParam = SelectionStart().Position();
+		}
+		return pdoc->LineFromPosition(wParam);
+
+	case EM_EXLINEFROMCHAR:
+		return pdoc->LineFromPosition(lParam);
+
+	case EM_GETSEL:
+		if (wParam) {
+			*reinterpret_cast<DWORD *>(wParam) = static_cast<DWORD>(SelectionStart().Position());
+		}
+		if (lParam) {
+			*reinterpret_cast<DWORD *>(lParam) = static_cast<DWORD>(SelectionEnd().Position());
+		}
+		return MAKELRESULT(SelectionStart().Position(), SelectionEnd().Position());
+>>>>>>> .merge_file_a04612
 
 		case WM_RBUTTONDOWN: {
 			::SetFocus(MainHWND());
@@ -1761,7 +1888,21 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 				SetEmptySelection(PositionFromLocation(PointFromLParam(lParam)));
 			}
 
+<<<<<<< .merge_file_a18964
 			RightButtonDownWithModifiers(pt, ::GetMessageTime(), MouseModifiers(wParam));
+=======
+	case EM_SETSEL: {
+			Sci::Position nStart = wParam;
+			Sci::Position nEnd = lParam;
+			if (nStart == 0 && nEnd == -1) {
+				nEnd = pdoc->Length();
+			}
+			if (nStart == -1) {
+				nStart = nEnd;	// Remove selection
+			}
+			SetSelection(nEnd, nStart);
+			EnsureCaretVisible();
+>>>>>>> .merge_file_a04612
 		}
 		break;
 
@@ -1892,12 +2033,17 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			break;
 
 		case WM_DPICHANGED:
+<<<<<<< .merge_file_a18964
 			dpi.x = dpi.y = HIWORD(wParam);
 			vs.fontsValid = false;
+=======
+			dpi = HIWORD(wParam);
+>>>>>>> .merge_file_a04612
 			InvalidateStyleRedraw();
 			break;
 
 		case WM_DPICHANGED_AFTERPARENT: {
+<<<<<<< .merge_file_a18964
 			DPI_T const dpiNow = GetWindowDPI(MainHWND());
 			if ((dpi.x != dpiNow.x) || (dpi.y != dpiNow.y)) {
 				dpi = dpiNow;
@@ -1924,6 +2070,15 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 			} else {
 				return HandleCompositionWindowed(wParam, lParam);
 			}
+=======
+				const UINT dpiNow = DpiForWindow(wMain.GetID());
+				if (dpi != dpiNow) {
+					dpi = dpiNow;
+					InvalidateStyleRedraw();
+				}
+			}
+			break;
+>>>>>>> .merge_file_a04612
 
 		case WM_CONTEXTMENU:
 #if SCI_EnablePopupMenu
@@ -2536,6 +2691,7 @@ void ScintillaWin::Copy(bool asBinary) {
 	}
 }
 
+<<<<<<< .merge_file_a18964
 void ScintillaWin::CopyAllowLine() {
 	SelectionText selectedText;
 	CopySelectionRange(&selectedText, true);
@@ -2543,6 +2699,9 @@ void ScintillaWin::CopyAllowLine() {
 }
 
 bool ScintillaWin::CanPaste() noexcept {
+=======
+bool ScintillaWin::CanPaste() {
+>>>>>>> .merge_file_a04612
 	if (!Editor::CanPaste())
 		return false;
 	return ::IsClipboardFormatAvailable(CF_UNICODETEXT);
@@ -2943,11 +3102,20 @@ void ScintillaWin::ImeStartComposition() {
 			// Since the style creation code has been made platform independent,
 			// The logfont for the IME is recreated here.
 			const int styleHere = pdoc->StyleIndexAt(sel.MainCaret());
+<<<<<<< .merge_file_a18964
 			LOGFONTW lf = { };
 			const int sizeZoomed = GetFontSizeZoomed(vs.styles[styleHere].size, vs.zoomLevel);
 			// The negative is to allow for leading
 			lf.lfHeight = -::MulDiv(sizeZoomed, dpi.y, 72 * SC_FONT_SIZE_MULTIPLIER);
 			lf.lfWidth = 0; // vs.styles[styleHere].stretch ?
+=======
+			LOGFONTW lf = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, L""};
+			int sizeZoomed = vs.styles[styleHere].size + vs.zoomLevel * SC_FONT_SIZE_MULTIPLIER;
+			if (sizeZoomed <= 2 * SC_FONT_SIZE_MULTIPLIER)	// Hangs if sizeZoomed <= 1
+				sizeZoomed = 2 * SC_FONT_SIZE_MULTIPLIER;
+			// The negative is to allow for leading
+			lf.lfHeight = -::MulDiv(sizeZoomed, dpi, 72*SC_FONT_SIZE_MULTIPLIER);
+>>>>>>> .merge_file_a04612
 			lf.lfWeight = vs.styles[styleHere].weight;
 			lf.lfItalic = vs.styles[styleHere].italic ? 1 : 0;
 			lf.lfCharSet = DEFAULT_CHARSET;

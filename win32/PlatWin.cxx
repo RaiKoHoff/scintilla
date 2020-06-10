@@ -110,15 +110,10 @@ void Scintilla_LoadDpiForWindow(void) {
 		::ReleaseDC({}, hDC);
 	}
 
-	if (fnGetDpiForWindow == nullptr) {
-		HMODULE hShcore = ::LoadLibraryExW(L"shcore.dll", {}, LOAD_LIBRARY_SEARCH_SYSTEM32);
-		if (hShcore) {
-			pfnGetDpiForMonitor = DLLFunction<GetDpiForMonitorSig>(hShcore, "GetDpiForMonitor");
-			if (pfnGetDpiForMonitor) {
-				hShcoreDLL = hShcore;
-			} else {
-				FreeLibrary(hShcore);
-			}
+	if (!fnGetDpiForWindow) {
+		hShcoreDLL = ::LoadLibraryExW(L"shcore.dll", {}, LOAD_LIBRARY_SEARCH_SYSTEM32);
+		if (hShcoreDLL) {
+			pfnGetDpiForMonitor = DLLFunction<GetDpiForMonitorSig>(hShcoreDLL, "GetDpiForMonitor");
 		}
 	}
 }
@@ -145,6 +140,7 @@ int SystemMetricsForDpi(int nIndex, unsigned dpi) {
 	if (fnGetSystemMetricsForDpi) {
 		return fnGetSystemMetricsForDpi(nIndex, dpi);
 	}
+
 	int value = ::GetSystemMetrics(nIndex);
 	value = (dpi == g_uSystemDPI) ? value : ::MulDiv(value, dpi, g_uSystemDPI);
 	return value;
@@ -175,6 +171,10 @@ static HMODULE hDLLDWrite {};
 bool LoadD2D() noexcept {
 	static bool triedLoadingD2D = false;
 	if (!triedLoadingD2D) {
+		DWORD loadLibraryFlags = 0;
+		HMODULE kernel32 = ::GetModuleHandleW(L"kernel32.dll");
+		if (kernel32) {
+			if (::GetProcAddress(kernel32, "SetDefaultDllDirectories")) {
 				// Availability of SetDefaultDllDirectories implies Windows 8+ or
 				// that KB2533623 has been installed so LoadLibraryEx can be called
 				// with LOAD_LIBRARY_SEARCH_SYSTEM32.
@@ -184,6 +184,7 @@ bool LoadD2D() noexcept {
 		using DWriteCreateFactorySig = HRESULT(WINAPI *)(DWRITE_FACTORY_TYPE factoryType, REFIID iid,
 			IUnknown **factory);
 
+<<<<<<< HEAD
 		hDLLD2D = ::LoadLibraryEx(L"d2d1.dll", {}, kSystemLibraryLoadFlags);
 		if (hDLLD2D) {
 			D2D1CreateFactorySig fnD2DCF = DLLFunction<D2D1CreateFactorySig>(hDLLD2D, "D2D1CreateFactory");
@@ -213,15 +214,33 @@ bool LoadD2D() noexcept {
 
 				const HRESULT hr = fnDWCF(DWRITE_FACTORY_TYPE_SHARED,
 					IID_IDWriteFactory2,
+=======
+		hDLLD2D = ::LoadLibraryEx(TEXT("D2D1.DLL"), 0, loadLibraryFlags);
+		D2D1CFSig fnD2DCF = DLLFunction<D2D1CFSig>(hDLLD2D, "D2D1CreateFactory");
+		if (fnD2DCF) {
+			// A single threaded factory as Scintilla always draw on the GUI thread
+			fnD2DCF(D2D1_FACTORY_TYPE_SINGLE_THREADED,
+				__uuidof(ID2D1Factory),
+				nullptr,
+				reinterpret_cast<IUnknown**>(&pD2DFactory));
+		}
+		hDLLDWrite = ::LoadLibraryEx(TEXT("DWRITE.DLL"), 0, loadLibraryFlags);
+		DWriteCFSig fnDWCF = DLLFunction<DWriteCFSig>(hDLLDWrite, "DWriteCreateFactory");
+		if (fnDWCF) {
+			const GUID IID_IDWriteFactory2 = // 0439fc60-ca44-4994-8dee-3a9af7b732ec
+			{ 0x0439fc60, 0xca44, 0x4994, { 0x8d, 0xee, 0x3a, 0x9a, 0xf7, 0xb7, 0x32, 0xec } };
+
+			const HRESULT hr = fnDWCF(DWRITE_FACTORY_TYPE_SHARED,
+				IID_IDWriteFactory2,
+				reinterpret_cast<IUnknown**>(&pIDWriteFactory));
+			if (SUCCEEDED(hr)) {
+				// D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT
+				d2dDrawTextOptions = static_cast<D2D1_DRAW_TEXT_OPTIONS>(0x00000004);
+			} else {
+				fnDWCF(DWRITE_FACTORY_TYPE_SHARED,
+					__uuidof(IDWriteFactory),
+>>>>>>> master
 					reinterpret_cast<IUnknown**>(&pIDWriteFactory));
-				if (SUCCEEDED(hr)) {
-					// D2D1_DRAW_TEXT_OPTIONS_ENABLE_COLOR_FONT
-					d2dDrawTextOptions = static_cast<D2D1_DRAW_TEXT_OPTIONS>(0x00000004);
-				} else {
-					fnDWCF(DWRITE_FACTORY_TYPE_SHARED,
-						__uuidof(IDWriteFactory),
-						reinterpret_cast<IUnknown**>(&pIDWriteFactory));
-				}
 			}
 		}
 
@@ -275,11 +294,11 @@ struct FormatAndMetrics {
 		extraFontFlag(extraFontFlag_), characterSet(characterSet_), yAscent(2), yDescent(1), yInternalLeading(0) {}
 #if defined(USE_D2D)
 	FormatAndMetrics(const LOGFONTW &lf_, IDWriteTextFormat *pTextFormat_,
-	        int extraFontFlag_,
-	        int characterSet_,
-	        FLOAT yAscent_,
-	        FLOAT yDescent_,
-	        FLOAT yInternalLeading_) noexcept :
+		int extraFontFlag_,
+		int characterSet_,
+		FLOAT yAscent_,
+		FLOAT yDescent_,
+		FLOAT yInternalLeading_) noexcept :
 		technology(SCWIN_TECH_DIRECTWRITE),
 		lf(lf_),
 		hfont{},
@@ -323,9 +342,36 @@ HFONT FormatAndMetrics::HFont() const noexcept {
 
 namespace {
 
-HINSTANCE hinstPlatformRes {};
+// system DPI, same for all monitor.
+UINT uSystemDPI = USER_DEFAULT_SCREEN_DPI;
 
-HCURSOR reverseArrowCursor {};
+using GetDpiForWindowSig = UINT(WINAPI *)(HWND hwnd);
+GetDpiForWindowSig fnGetDpiForWindow = nullptr;
+
+using GetSystemMetricsForDpiSig = int(WINAPI *)(int nIndex, UINT dpi);
+GetSystemMetricsForDpiSig fnGetSystemMetricsForDpi = nullptr;
+
+using AdjustWindowRectExForDpiSig = BOOL(WINAPI *)(LPRECT lpRect, DWORD dwStyle, BOOL bMenu, DWORD dwExStyle, UINT dpi);
+AdjustWindowRectExForDpiSig fnAdjustWindowRectExForDpi = nullptr;
+
+void LoadDpiForWindow() noexcept {
+	HMODULE user32 = ::GetModuleHandleW(L"user32.dll");
+	fnGetDpiForWindow = DLLFunction<GetDpiForWindowSig>(user32, "GetDpiForWindow");
+	fnGetSystemMetricsForDpi = DLLFunction<GetSystemMetricsForDpiSig>(user32, "GetSystemMetricsForDpi");
+	fnAdjustWindowRectExForDpi = DLLFunction<AdjustWindowRectExForDpiSig>(user32, "AdjustWindowRectExForDpi");
+
+	using GetDpiForSystemSig = UINT(WINAPI *)(void);
+	GetDpiForSystemSig fnGetDpiForSystem = DLLFunction<GetDpiForSystemSig>(user32, "GetDpiForSystem");
+	if (fnGetDpiForSystem) {
+		uSystemDPI = fnGetDpiForSystem();
+	} else {
+		HDC hdcMeasure = ::CreateCompatibleDC({});
+		uSystemDPI = ::GetDeviceCaps(hdcMeasure, LOGPIXELSY);
+		::DeleteDC(hdcMeasure);
+	}
+}
+
+HINSTANCE hinstPlatformRes {};
 
 inline FormatAndMetrics *FamFromFontID(void *fid) noexcept {
 	return static_cast<FormatAndMetrics *>(fid);
@@ -541,6 +587,23 @@ public:
 };
 using TextPositions = VarBuffer<XYPOSITION, stackBufferLength>;
 
+UINT DpiForWindow(WindowID wid) noexcept {
+	if (fnGetDpiForWindow) {
+		return fnGetDpiForWindow(HwndFromWindowID(wid));
+	}
+	return uSystemDPI;
+}
+
+int SystemMetricsForDpi(int nIndex, UINT dpi) noexcept {
+	if (fnGetSystemMetricsForDpi) {
+		return fnGetSystemMetricsForDpi(nIndex, dpi);
+	}
+
+	int value = ::GetSystemMetrics(nIndex);
+	value = (dpi == uSystemDPI) ? value : ::MulDiv(value, dpi, uSystemDPI);
+	return value;
+}
+
 class SurfaceGDI : public Surface {
 	bool unicodeMode=false;
 	HDC hdc{};
@@ -663,22 +726,36 @@ bool SurfaceGDI::Initialised() const noexcept {
 	return hdc != nullptr;
 }
 
+<<<<<<< HEAD
 void SurfaceGDI::Init(WindowID wid) noexcept {
+=======
+void SurfaceGDI::Init(WindowID wid) {
+>>>>>>> master
 	Release();
 	logPixelsY = DpiForWindow(wid);
 	hdc = ::CreateCompatibleDC({});
 	hdcOwned = true;
 	::SetTextAlign(hdc, TA_BASELINE);
+	logPixelsY = DpiForWindow(wid);
 }
 
+<<<<<<< HEAD
 void SurfaceGDI::Init(SurfaceID sid, WindowID wid) noexcept {
+=======
+void SurfaceGDI::Init(SurfaceID sid, WindowID wid) {
+>>>>>>> master
 	Release();
 	logPixelsY = DpiForWindow(wid);
 	hdc = static_cast<HDC>(sid);
 	::SetTextAlign(hdc, TA_BASELINE);
+	logPixelsY = DpiForWindow(wid);
 }
 
+<<<<<<< HEAD
 void SurfaceGDI::InitPixMap(int width, int height, Surface *surface_, WindowID wid) noexcept {
+=======
+void SurfaceGDI::InitPixMap(int width, int height, Surface *surface_, WindowID wid) {
+>>>>>>> master
 	Release();
 	logPixelsY = DpiForWindow(wid);
 	SurfaceGDI *psurfOther = down_cast<SurfaceGDI *>(surface_);
@@ -691,6 +768,7 @@ void SurfaceGDI::InitPixMap(int width, int height, Surface *surface_, WindowID w
 	::SetTextAlign(hdc, TA_BASELINE);
 	SetUnicodeMode(psurfOther->unicodeMode);
 	SetDBCSMode(psurfOther->codePage);
+	logPixelsY = DpiForWindow(wid);
 }
 
 void SurfaceGDI::PenColour(ColourDesired fore) noexcept {
@@ -727,7 +805,11 @@ void SurfaceGDI::SetFont(const Font &font_) noexcept {
 	}
 }
 
+<<<<<<< HEAD
 int SurfaceGDI::LogPixelsY() const noexcept {
+=======
+int SurfaceGDI::LogPixelsY() {
+>>>>>>> master
 	return logPixelsY;
 }
 
@@ -1140,9 +1222,16 @@ public:
 	SurfaceD2D &operator=(SurfaceD2D &&) = delete;
 	~SurfaceD2D() noexcept override;
 
+<<<<<<< HEAD
 	void Init(WindowID wid) noexcept override;
 	void Init(SurfaceID sid, WindowID wid) noexcept override;
 	void InitPixMap(int width, int height, Surface *surface_, WindowID wid) noexcept override;
+=======
+	void SetScale(WindowID wid);
+	void Init(WindowID wid) override;
+	void Init(SurfaceID sid, WindowID wid) override;
+	void InitPixMap(int width, int height, Surface *surface_, WindowID wid) override;
+>>>>>>> master
 
 	void Release() noexcept override;
 	bool Initialised() const noexcept override;
@@ -1240,7 +1329,15 @@ void SurfaceD2D::Release() noexcept {
 	Clear();
 }
 
+<<<<<<< HEAD
 bool SurfaceD2D::Initialised() const noexcept {
+=======
+void SurfaceD2D::SetScale(WindowID wid) {
+	logPixelsY = DpiForWindow(wid);
+}
+
+bool SurfaceD2D::Initialised() {
+>>>>>>> master
 	return pRenderTarget != nullptr;
 }
 
@@ -1248,6 +1345,7 @@ HRESULT SurfaceD2D::FlushDrawing() const noexcept {
 	return pRenderTarget->Flush();
 }
 
+<<<<<<< HEAD
 void SurfaceD2D::Init(WindowID wid) noexcept {
 	Release();
 	logPixelsY = DpiForWindow(wid);
@@ -1263,6 +1361,23 @@ void SurfaceD2D::InitPixMap(int width, int height, Surface *surface_, WindowID w
 	Release();
 	logPixelsY = DpiForWindow(wid);
 	SurfaceD2D *psurfOther = down_cast<SurfaceD2D *>(surface_);
+=======
+void SurfaceD2D::Init(WindowID wid) {
+	Release();
+	SetScale(wid);
+}
+
+void SurfaceD2D::Init(SurfaceID sid, WindowID wid) {
+	Release();
+	SetScale(wid);
+	pRenderTarget = static_cast<ID2D1RenderTarget *>(sid);
+}
+
+void SurfaceD2D::InitPixMap(int width, int height, Surface *surface_, WindowID wid) {
+	Release();
+	SetScale(wid);
+	SurfaceD2D *psurfOther = dynamic_cast<SurfaceD2D *>(surface_);
+>>>>>>> master
 	// Should only ever be called with a SurfaceD2D, not a SurfaceGDI
 	PLATFORM_ASSERT(psurfOther);
 	const D2D1_SIZE_F desiredSize = D2D1::SizeF(static_cast<float>(width), static_cast<float>(height));
@@ -1741,7 +1856,7 @@ void ScreenLineLayout::FillTextLayoutFormats(const IScreenLine *screenLine, IDWr
 	for (size_t bytePosition = 0; bytePosition < screenLine->Length();) {
 		const unsigned char uch = screenLine->Text()[bytePosition];
 		const unsigned int byteCount = UTF8BytesOfLead[uch];
-		const UINT32 codeUnits = static_cast<UINT32>(UTF16LengthFromUTF8ByteCount(byteCount));
+		const UINT32 codeUnits = UTF16LengthFromUTF8ByteCount(byteCount);
 		const DWRITE_TEXT_RANGE textRange = { layoutPosition, codeUnits };
 
 		XYPOSITION representationWidth = screenLine->RepresentationWidth(bytePosition);
@@ -1909,9 +2024,15 @@ XYPOSITION ScreenLineLayout::XFromPosition(size_t caretPosition) noexcept {
 	// Convert byte positions to wchar_t positions
 	const size_t position = GetPositionInLayout(text, caretPosition);
 
+<<<<<<< HEAD
 	// Translate text character offset to point (x, y).
 	DWRITE_HIT_TEST_METRICS caretMetrics {};
 	Point pt {};
+=======
+	// Translate text character offset to point x,y.
+	DWRITE_HIT_TEST_METRICS caretMetrics {};
+	Point pt;
+>>>>>>> master
 
 	textLayout->HitTestTextPosition(
 		static_cast<UINT32>(position),
@@ -2325,8 +2446,13 @@ void Window::InvalidateRectangle(PRectangle rc) noexcept {
 	::InvalidateRect(HwndFromWindowID(wid), &rcw, FALSE);
 }
 
+<<<<<<< HEAD
 void Window::SetFont(const Font &font) noexcept {
 	SetWindowFont(HwndFromWindowID(wid), font.GetID(), FALSE);
+=======
+void Window::SetFont(Font &font) {
+	SetWindowFont(HwndFromWindowID(wid), font.GetID(), 0);
+>>>>>>> master
 }
 
 namespace {
@@ -2343,15 +2469,26 @@ void FlipBitmap(HBITMAP bitmap, int width, int height) noexcept {
 
 }
 
+<<<<<<< HEAD
 HCURSOR LoadReverseArrowCursor(DPI_T dpi) noexcept {
 	HCURSOR reverseArrowCursor{};
+=======
+HCURSOR LoadReverseArrowCursor(UINT dpi) noexcept {
+	HCURSOR reverseArrowCursor {};
+>>>>>>> master
 
 	bool created = false;
 	HCURSOR cursor = ::LoadCursor({}, IDC_ARROW);
 
+<<<<<<< HEAD
 	if (dpi.y != g_uSystemDPI) {
 		const int width = SystemMetricsForDpi(SM_CXCURSOR, dpi.x);
 		const int height = SystemMetricsForDpi(SM_CYCURSOR, dpi.y);
+=======
+	if (dpi != uSystemDPI) {
+		const int width = SystemMetricsForDpi(SM_CXCURSOR, dpi);
+		const int height = SystemMetricsForDpi(SM_CYCURSOR, dpi);
+>>>>>>> master
 		HCURSOR copy = static_cast<HCURSOR>(::CopyImage(cursor, IMAGE_CURSOR, width, height, LR_COPYFROMRESOURCE | LR_COPYRETURNORG));
 		if (copy) {
 			created = copy != cursor;
@@ -2495,7 +2632,11 @@ class ListBoxX : public ListBox {
 	HBRUSH hbrBackground;
 	Window *parent;
 	int ctrlID;
+<<<<<<< HEAD
 	DPI_T dpi;
+=======
+	UINT dpi;
+>>>>>>> master
 	IListBoxDelegate *delegate;
 	const char *widestItem;
 	unsigned int maxCharWidth;
@@ -2507,7 +2648,11 @@ class ListBoxX : public ListBox {
 
 	HWND GetHWND() const noexcept;
 	void AppendListItem(const char *text, const char *numword);
+<<<<<<< HEAD
 	static void AdjustWindowRect(PRectangle *rc, UINT dpi) noexcept;
+=======
+	static void AdjustWindowRect(PRectangle *rc, UINT dpi);
+>>>>>>> master
 	int ItemHeight() const;
 	int MinClientWidth() const noexcept;
 	int TextOffset() const;
@@ -2531,8 +2676,12 @@ class ListBoxX : public ListBox {
 public:
 	ListBoxX() noexcept : lineHeight(10), fontCopy{}, technology(0), lb{}, unicodeMode(false),
 		desiredVisibleRows(9), maxItemCharacters(0), aveCharWidth(8),
+<<<<<<< HEAD
 		colorText(0), colorBackground(0), hbrBackground{},
 		parent(nullptr), ctrlID(0), dpi({ USER_DEFAULT_SCREEN_DPI, USER_DEFAULT_SCREEN_DPI }),
+=======
+		parent(nullptr), ctrlID(0), dpi(USER_DEFAULT_SCREEN_DPI),
+>>>>>>> master
 		delegate(nullptr),
 		widestItem(nullptr), maxCharWidth(1), resizeHit(0), wheelDelta(0) {}
 	~ListBoxX() override {
@@ -2603,7 +2752,11 @@ void ListBoxX::Create(Window &parent_, int ctrlID_, Point location_, int lineHei
 		hinstanceParent,
 		this);
 
+<<<<<<< HEAD
 	dpi = GetWindowDPI(hwndParent);
+=======
+	dpi = DpiForWindow(hwndParent);
+>>>>>>> master
 	POINT locationw = POINTFromPoint(location);
 	::MapWindowPoints(hwndParent, {}, &locationw, 1);
 	location = PointFromPOINT(locationw);
@@ -2617,6 +2770,7 @@ void ListBoxX::SetFont(const Font &font) noexcept {
 		}
 		const FormatAndMetrics *pfm = static_cast<FormatAndMetrics *>(font.GetID());
 		fontCopy = pfm->HFont();
+<<<<<<< HEAD
 		SetWindowFont(lb, fontCopy, FALSE);
 	}
 }
@@ -2625,6 +2779,9 @@ void ListBoxX::SetColour(ColourDesired fore, ColourDesired back) noexcept {
 	if (hbrBackground) {
 		::DeleteObject(hbrBackground);
 		hbrBackground = {};
+=======
+		SetWindowFont(lb, fontCopy, 0);
+>>>>>>> master
 	}
 	colorText = fore.AsInteger();
 	colorBackground = back.AsInteger();
@@ -2681,11 +2838,18 @@ PRectangle ListBoxX::GetDesiredRect() {
 		width = widthDesired;
 
 	rcDesired.right = rcDesired.left + TextOffset() + width + (TextInset.x * 2);
+<<<<<<< HEAD
 	if (Length() > rows) {
 		rcDesired.right += SystemMetricsForDpi(SM_CXVSCROLL, dpi.x);
 	}
 
 	AdjustWindowRect(&rcDesired, dpi.y);
+=======
+	if (Length() > rows)
+		rcDesired.right += SystemMetricsForDpi(SM_CXVSCROLL, dpi);
+
+	AdjustWindowRect(&rcDesired, dpi);
+>>>>>>> master
 	return rcDesired;
 }
 
@@ -2696,7 +2860,11 @@ int ListBoxX::TextOffset() const {
 
 int ListBoxX::CaretFromEdge() const {
 	PRectangle rc;
+<<<<<<< HEAD
 	AdjustWindowRect(&rc, dpi.y);
+=======
+	AdjustWindowRect(&rc, dpi);
+>>>>>>> master
 	return TextOffset() + static_cast<int>(TextInset.x + (0 - rc.left) - 1);
 }
 
@@ -2894,6 +3062,7 @@ void ListBoxX::SetList(const char *list, const char separator, const char typese
 	SetRedraw(true);
 }
 
+<<<<<<< HEAD
 void ListBoxX::AdjustWindowRect(PRectangle *rc, UINT dpi) noexcept {
 	RECT rcw = RectFromPRectangle(*rc);
 #if LISTBOXX_USE_THICKFRAME
@@ -2903,6 +3072,15 @@ void ListBoxX::AdjustWindowRect(PRectangle *rc, UINT dpi) noexcept {
 #else
 	DpiAdjustWindowRect(&rcw, 0, WS_EX_WINDOWEDGE, dpi);
 #endif
+=======
+void ListBoxX::AdjustWindowRect(PRectangle *rc, UINT dpi) {
+	RECT rcw = RectFromPRectangle(*rc);
+	if (fnAdjustWindowRectExForDpi) {
+		fnAdjustWindowRectExForDpi(&rcw, WS_THICKFRAME, false, WS_EX_WINDOWEDGE, dpi);
+	} else {
+		::AdjustWindowRectEx(&rcw, WS_THICKFRAME, false, WS_EX_WINDOWEDGE);
+	}
+>>>>>>> master
 	*rc = PRectangle::FromInts(rcw.left, rcw.top, rcw.right, rcw.bottom);
 #if LISTBOXX_USE_FAKE_FRAME
 	*rc = rc->Inflate(ListBoxXFakeFrameSize, ListBoxXFakeFrameSize);
@@ -2924,7 +3102,11 @@ int ListBoxX::MinClientWidth() const noexcept {
 
 POINT ListBoxX::MinTrackSize() const {
 	PRectangle rc = PRectangle::FromInts(0, 0, MinClientWidth(), ItemHeight());
+<<<<<<< HEAD
 	AdjustWindowRect(&rc, dpi.y);
+=======
+	AdjustWindowRect(&rc, dpi);
+>>>>>>> master
 	POINT ret = {static_cast<LONG>(rc.Width()), static_cast<LONG>(rc.Height())};
 	return ret;
 }
@@ -2933,9 +3115,17 @@ POINT ListBoxX::MaxTrackSize() const {
 	const int width = maxCharWidth * maxItemCharacters + static_cast<int>(TextInset.x) * 2 +
 		TextOffset() + SystemMetricsForDpi(SM_CXVSCROLL, dpi.x);
 	PRectangle rc = PRectangle::FromInts(0, 0,
+<<<<<<< HEAD
 		std::max(MinClientWidth(), width),
 		ItemHeight() * lti.Count());
 	AdjustWindowRect(&rc, dpi.y);
+=======
+		std::max(static_cast<unsigned int>(MinClientWidth()),
+		maxCharWidth * maxItemCharacters + static_cast<int>(TextInset.x) * 2 +
+		 TextOffset() + SystemMetricsForDpi(SM_CXVSCROLL, dpi)),
+		ItemHeight() * lti.Count());
+	AdjustWindowRect(&rc, dpi);
+>>>>>>> master
 	POINT ret = {static_cast<LONG>(rc.Width()), static_cast<LONG>(rc.Height())};
 	return ret;
 }
@@ -3042,7 +3232,11 @@ LRESULT ListBoxX::NcHitTest(WPARAM wParam, LPARAM lParam) const noexcept {
 	// window caption height + frame, even if one is hovering over the bottom edge of
 	// the frame, so workaround that here
 	if (hit >= HTTOP && hit <= HTTOPRIGHT) {
+<<<<<<< HEAD
 		const int minHeight = SystemMetricsForDpi(SM_CYMINTRACK, dpi.y);
+=======
+		const int minHeight = SystemMetricsForDpi(SM_CYMINTRACK, dpi);
+>>>>>>> master
 		const int yPos = GET_Y_LPARAM(lParam);
 		if ((rc.Height() < minHeight) && (yPos > ((rc.top + rc.bottom)/2))) {
 			hit += HTBOTTOM - HTTOP;
@@ -3557,9 +3751,14 @@ bool Platform::ShowAssertionPopUps(bool) noexcept {
 }
 #endif
 
+<<<<<<< HEAD
 #ifdef TRACE
 void Platform::Assert(const char *c, const char *file, int line) noexcept {
 	char buffer[2000]{};
+=======
+void Platform::Assert(const char *c, const char *file, int line) {
+	char buffer[2000] {};
+>>>>>>> master
 	sprintf(buffer, "Assertion [%s] failed at %s %d%s", c, file, line, assertionPopUps ? "" : "\r\n");
 	if (assertionPopUps) {
 		const int idButton = ::MessageBoxA({}, buffer, "Assertion failure",
@@ -3584,6 +3783,10 @@ void Platform::Assert(const char *, const char *, int) noexcept {
 
 void Platform_Initialise(void *hInstance) noexcept {
 	hinstPlatformRes = static_cast<HINSTANCE>(hInstance);
+<<<<<<< HEAD
+=======
+	LoadDpiForWindow();
+>>>>>>> master
 	ListBoxX_Register();
 }
 
@@ -3620,91 +3823,8 @@ void Platform_Finalise(bool fromDllMain) noexcept {
 		}
 	}
 #endif
-	if (reverseArrowCursor)
-		::DestroyCursor(reverseArrowCursor);
 	ListBoxX_Unregister();
 }
 
-#if 0
-//=============================================================================
-//
-//  GetCurrentDPI()
-//
-#ifdef _WIN64
-typedef INT_PTR(FAR WINAPI* FARPROCHWND)(HWND);
-typedef INT_PTR(FAR WINAPI* FARPROCDPI)(int, UINT);
-typedef INT_PTR(FAR WINAPI* FARPROCMONI)(HMONITOR, int, UINT*, UINT*);
-#else
-typedef int (FAR WINAPI* FARPROCHWND)(HWND);
-typedef int (FAR WINAPI* FARPROCDPI)(int, UINT);
-typedef int (FAR WINAPI* FARPROCMONI)(HMONITOR, int, UINT*, UINT*);
-#endif  // _WIN64
-
-
-DPI_T GetCurrentDPI(HWND hwnd) {
-
-	DPI_T curDPI = { 0, 0 };
-
-	if (IsWindows10OrGreater()) {
-		static HMODULE hModule = nullptr;
-		if (!hModule) { hModule = GetModuleHandle(L"User32.dll"); }
-		if (hModule) {
-			FARPROCHWND const pfnGetDpiForWindow = (FARPROCHWND)GetProcAddress(hModule, "GetDpiForWindow");
-			if (pfnGetDpiForWindow) {
-				curDPI.x = curDPI.y = (int)pfnGetDpiForWindow(hwnd);
-			}
-		}
-	}
-
-	if ((curDPI.x == 0) && IsWindows8Point1OrGreater()) {
-		HMODULE const hShcore = LoadLibrary(L"shcore.dll");
-		if (hShcore) {
-			FARPROCMONI const pfnGetDpiForMonitor = (FARPROCMONI)GetProcAddress(hShcore, "GetDpiForMonitor");
-			if (pfnGetDpiForMonitor) {
-				HMONITOR const hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-				UINT dpiX = 0, dpiY = 0;
-				if (pfnGetDpiForMonitor(hMonitor, 0 /* MDT_EFFECTIVE_DPI */, &dpiX, &dpiY) == S_OK) {
-					curDPI.x = dpiX;
-					curDPI.y = dpiY;
-				}
-			}
-			FreeLibrary(hShcore);
-		}
-	}
-
-	if (curDPI.x == 0) {
-		HDC hDC = GetDC(hwnd);
-		curDPI.x = GetDeviceCaps(hDC, LOGPIXELSX);
-		curDPI.y = GetDeviceCaps(hDC, LOGPIXELSY);
-		ReleaseDC(hwnd, hDC);
-	}
-
-	curDPI.x = std::max((int)curDPI.x, USER_DEFAULT_SCREEN_DPI);
-	curDPI.y = std::max((int)curDPI.y, USER_DEFAULT_SCREEN_DPI);
-	return curDPI;
-}
-
-//=============================================================================
-//
-//  GetSystemMetricsEx()
-//  get system metric for current DPI 
-// https://docs.microsoft.com/de-de/windows/desktop/api/winuser/nf-winuser-getsystemmetricsfordpi
-//
-int GetSystemMetricsEx(HWND hwnd, int nIndex)
-{
-	if (IsWindows10OrGreater()) {
-		static HMODULE hModule = nullptr;
-		if (!hModule) { hModule = GetModuleHandle(L"User32.dll"); }
-		if (hModule) {
-			FARPROCHWND const pfnGetDpiForWindow = (FARPROCHWND)GetProcAddress(hModule, "GetDpiForWindow");
-			FARPROCDPI const pfnGetSystemMetricsForDpi = (FARPROCDPI)GetProcAddress(hModule, "GetSystemMetricsForDpi");
-			if (pfnGetDpiForWindow && pfnGetSystemMetricsForDpi) {
-				return (int)pfnGetSystemMetricsForDpi(nIndex, (UINT)pfnGetDpiForWindow(hwnd));
-			}
-		}
-	}
-	return ScaleIntToDPI_Y(hwnd, GetSystemMetrics(nIndex));
-}
-#endif
 
 } // namespace Scintilla
