@@ -977,15 +977,17 @@
 	</li>
  	<li>
 	On Win32, limit text returned from WM_GETTEXT to the length specified in wParam.
-	<a href="https://sourceforge.net/p/scintilla/bugs/2110/">Bug #2110</a>.
+	This could cause failures when using assistive technologies like NVDA.
+	<a href="https://sourceforge.net/p/scintilla/bugs/2110/">Bug #2110</a>,
+	<a href="https://sourceforge.net/p/scintilla/bugs/2114/">Bug #2114</a>.
+	</li>
+ 	<li>
+	Fix deletion of isolated invalid bytes.
+	<a href="https://sourceforge.net/p/scintilla/bugs/2116/">Bug #2116</a>.
 	</li>
  	<li>
 	Fix position of line caret when overstrike caret set to block.
 	<a href="https://sourceforge.net/p/scintilla/bugs/2106/">Bug #2106</a>.
-	</li>
- 	<li>
-	On GTK, reset IME when mouse is clicked.
-	<a href="https://sourceforge.net/p/scintilla/bugs/2111/">Bug #2111</a>.
 	</li>
     </ul>
     <h3>

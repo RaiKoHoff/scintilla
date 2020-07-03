@@ -44,16 +44,18 @@
 #endif
 #endif
 
-
+#ifdef __cplusplus
+DPI_T GetWindowDPI(HWND hwnd);
+int  SystemMetricsForDpi(int nIndex, unsigned dpi);
+BOOL AdjustWindowRectForDpi(LPRECT lpRect, DWORD dwStyle, DWORD dwExStyle, unsigned dpi);
+#else
 extern "C" DPI_T GetWindowDPI(HWND hwnd);
 extern "C" int  SystemMetricsForDpi(int nIndex, unsigned dpi);
-extern "C" BOOL DpiAdjustWindowRect(LPRECT lpRect, DWORD dwStyle, DWORD dwExStyle, unsigned dpi);
+extern "C" BOOL AdjustWindowRectForDpi(LPRECT lpRect, DWORD dwStyle, DWORD dwExStyle, unsigned dpi);
+#endif // !__cplusplus
+
 
 namespace Scintilla {
-
-#ifndef USER_DEFAULT_SCREEN_DPI
-#define USER_DEFAULT_SCREEN_DPI		96
-#endif
 
 extern void Platform_Initialise(void *hInstance) noexcept;
 extern void Platform_Finalise(bool fromDllMain) noexcept;
@@ -65,7 +67,7 @@ constexpr RECT RectFromPRectangle(PRectangle prc) noexcept {
 }
 
 constexpr POINT POINTFromPoint(Point pt) noexcept {
-	return POINT{ static_cast<LONG>(pt.x), static_cast<LONG>(pt.y) };
+	return POINT { static_cast<LONG>(pt.x), static_cast<LONG>(pt.y) };
 }
 
 constexpr Point PointFromPOINT(POINT pt) noexcept {
@@ -88,7 +90,7 @@ inline void SetWindowPointer(HWND hWnd, void *ptr) noexcept {
 	::SetWindowLongPtr(hWnd, 0, reinterpret_cast<LONG_PTR>(ptr));
 }
 
-// Find a function in a DLL and convert to a function pointer.
+/// Find a function in a DLL and convert to a function pointer.
 /// This avoids undefined and conditionally defined behaviour.
 template<typename T>
 inline T DLLFunction(HMODULE hModule, LPCSTR lpProcName) noexcept {
@@ -111,33 +113,30 @@ inline T DLLFunctionEx(LPCWSTR lpDllName, LPCSTR lpProcName) noexcept {
 	return DLLFunction<T>(::GetModuleHandleW(lpDllName), lpProcName);
 }
 
-inline UINT DpiForWindow(WindowID wid) noexcept {
+// Release an IUnknown* and set to nullptr.
+// While IUnknown::Release must be noexcept, it isn't marked as such so produces
+// warnings which are avoided by the catch.
+template <class T>
+inline void ReleaseUnknown(T *&ppUnknown) noexcept {
+	if (ppUnknown) {
+#if 1
+		ppUnknown->Release();
+#else
+		try {
+			ppUnknown->Release();
+		} catch (...) {
+			// Never occurs
+		}
+#endif
+		ppUnknown = nullptr;
+	}
+}
+
+inline UINT DpiYForWindow(WindowID wid) noexcept {
 	return GetWindowDPI(HwndFromWindowID(wid)).y;
-	// retrieving the logPixelsY per window may double the Font Size calculation
-	//return USER_DEFAULT_SCREEN_DPI; // DPI_AWARENESS set by manifest
 }
 
 HCURSOR LoadReverseArrowCursor(DPI_T dpi) noexcept;
-
-/// Find a function in a DLL and convert to a function pointer.
-/// This avoids undefined and conditionally defined behaviour.
-template<typename T>
-T DLLFunction(HMODULE hModule, LPCSTR lpProcName) noexcept {
-	if (!hModule) {
-		return nullptr;
-	}
-	FARPROC function = ::GetProcAddress(hModule, lpProcName);
-	static_assert(sizeof(T) == sizeof(function));
-	T fp;
-	memcpy(&fp, &function, sizeof(T));
-	return fp;
-}
-
-UINT DpiForWindow(WindowID wid) noexcept;
-
-int SystemMetricsForDpi(int nIndex, UINT dpi) noexcept;
-
-HCURSOR LoadReverseArrowCursor(UINT dpi) noexcept;
 
 #if defined(USE_D2D)
 extern bool LoadD2D() noexcept;
