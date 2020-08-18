@@ -5192,7 +5192,7 @@ void Editor::QueueIdleWork(WorkNeeded::workItems items, Sci::Position upTo) {
 	workNeeded.Need(items, upTo);
 }
 
-bool Editor::PaintContains(PRectangle rc) {
+bool Editor::PaintContains(PRectangle rc) const noexcept {
 	if (rc.Empty()) {
 		return true;
 	} else {
@@ -5200,7 +5200,7 @@ bool Editor::PaintContains(PRectangle rc) {
 	}
 }
 
-bool Editor::PaintContainsMargin() {
+bool Editor::PaintContainsMargin() const noexcept {
 	if (wMargin.GetID()) {
 		// With separate margin view, paint of text view
 		// never contains margin.

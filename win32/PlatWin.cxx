@@ -613,7 +613,7 @@ public:
 	void FlushCachedState() noexcept override;
 
 	void SetUnicodeMode(bool unicodeMode_) noexcept override;
-	//~void SetDBCSMode(int codePage_) noexcept override;
+	void SetDBCSMode(int codePage_) noexcept override;
 	void SetBidiR2L(bool bidiR2L_) noexcept override;
 };
 
@@ -689,7 +689,7 @@ void SurfaceGDI::InitPixMap(int width, int height, Surface *surface_, WindowID w
 	bitmapOld = SelectBitmap(hdc, bitmap);
 	::SetTextAlign(hdc, TA_BASELINE);
 	SetUnicodeMode(psurfOther->unicodeMode);
-	//~SetDBCSMode(psurfOther->codePage);
+	SetDBCSMode(psurfOther->codePage);
 }
 
 void SurfaceGDI::PenColour(ColourDesired fore) noexcept {
@@ -1186,12 +1186,10 @@ void SurfaceGDI::SetUnicodeMode(bool unicodeMode_) noexcept {
 	unicodeMode = unicodeMode_;
 }
 
-#if 0
 void SurfaceGDI::SetDBCSMode(int codePage_) noexcept {
 	// No action on window as automatically handled by system.
 	codePage = codePage_;
 }
-#endif
 
 void SurfaceGDI::SetBidiR2L(bool) noexcept {
 }
@@ -1289,7 +1287,7 @@ public:
 	void FlushCachedState() noexcept override;
 
 	void SetUnicodeMode(bool unicodeMode_) noexcept override;
-	//~void SetDBCSMode(int codePage_) noexcept override;
+	void SetDBCSMode(int codePage_) noexcept override;
 	void SetBidiR2L(bool bidiR2L_) noexcept override;
 };
 
@@ -1360,7 +1358,7 @@ void SurfaceD2D::InitPixMap(int width, int height, Surface *surface_, WindowID w
 		ownRenderTarget = true;
 	}
 	SetUnicodeMode(psurfOther->unicodeMode);
-	//~SetDBCSMode(psurfOther->codePage);
+	SetDBCSMode(psurfOther->codePage);
 }
 
 HRESULT SurfaceD2D::GetBitmap(ID2D1Bitmap **ppBitmap) {
@@ -2303,12 +2301,10 @@ void SurfaceD2D::SetUnicodeMode(bool unicodeMode_) noexcept {
 	unicodeMode = unicodeMode_;
 }
 
-#if 0
 void SurfaceD2D::SetDBCSMode(int codePage_) noexcept {
 	// No action on window as automatically handled by system.
 	codePage = codePage_;
 }
-#endif
 
 void SurfaceD2D::SetBidiR2L(bool) noexcept {
 }
