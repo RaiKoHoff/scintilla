@@ -185,8 +185,7 @@ EditView::EditView() {
 	customDrawWrapMarker = nullptr;
 }
 
-EditView::~EditView() {
-}
+EditView::~EditView() = default;
 
 bool EditView::SetTwoPhaseDraw(bool twoPhaseDraw) noexcept {
 	const PhasesDraw phasesDrawNew = twoPhaseDraw ? phasesTwo : phasesOne;

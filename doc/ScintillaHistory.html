@@ -558,6 +558,7 @@
 	<td>Prakash Sahni</td>
       </tr><tr>
 	<td>Michel Sauvard</td>
+	<td>uhf7</td>
     </tr>
     </table>
     <p>
@@ -568,6 +569,52 @@
         <a href="http://sourceforge.net/projects/icon-collection/">
         Icons</a> Copyright(C) 1998 by Dean S. Jones<br />
       </li>
+    </ul>
+    <h3>
+       <a href="https://www.scintilla.org/scite444.zip">Release 4.4.4</a>
+    </h3>
+    <ul>
+	<li>
+	Released 21 July 2020.
+	</li>
+	<li>
+	Fix position of marker symbols for SC_MARGIN_RTEXT which were being moved based on
+	width of text.
+	</li>
+	<li>
+	Allow cross-building for GTK by choosing pkg-config.
+	<a href="https://sourceforge.net/p/scintilla/bugs/2189/">Bug #2189</a>.
+	</li>
+	<li>
+	On GTK, allow setting CPPFLAGS (and LDFLAGS for SciTE) to support hardening.
+	<a href="https://sourceforge.net/p/scintilla/bugs/2191/">Bug #2191</a>.
+	</li>
+	<li>
+	Fixed bug on Win32 where cursor was flickering between hand and text over an
+	indicator with hover style.
+	<a href="https://sourceforge.net/p/scintilla/bugs/2170/">Bug #2170</a>.
+	</li>
+	<li>
+	Fixed bug where hovered indicator was not returning to non-hover
+	appearance when mouse moved out of window or into margin.
+	<a href="https://sourceforge.net/p/scintilla/bugs/2193/">Bug #2193</a>.
+	</li>
+	<li>
+	Fixed bug where gradient indicators were not showing hovered appearance.
+	</li>
+	<li>
+	For SciTE, don't show the output pane for quiet jobs.
+	<a href="https://sourceforge.net/p/scintilla/feature-requests/1365/">Feature #1365</a>.
+	</li>
+	<li>
+	Support command.quiet for SciTE on GTK.
+	<a href="https://sourceforge.net/p/scintilla/feature-requests/1365/">Feature #1365</a>.
+	</li>
+	<li>
+	Fixed a bug in SciTE with stack balance when a syntax error in the Lua startup script
+	caused continuing failures to find functions after the syntax error was corrected.
+	<a href="https://sourceforge.net/p/scintilla/bugs/2176/">Bug #2176</a>.
+	</li>
     </ul>
     <h3>
        <a href="https://www.scintilla.org/scite444.zip">Release 4.4.4</a>
