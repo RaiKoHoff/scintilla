@@ -219,6 +219,12 @@
     <ClCompile Include="oniguruma\src\utf8.c">
       <Filter>oniguruma\src</Filter>
     </ClCompile>
+    <ClCompile Include="oniguruma\src\regposerr.c">
+      <Filter>oniguruma\src</Filter>
+    </ClCompile>
+    <ClCompile Include="oniguruma\src\regposix.c">
+      <Filter>oniguruma\src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\ILexer.h">
