@@ -434,5 +434,8 @@
     <ClInclude Include="oniguruma\src\st.h">
       <Filter>oniguruma\src</Filter>
     </ClInclude>
+    <ClInclude Include="oniguruma\src\onigposix.h">
+      <Filter>oniguruma\src</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

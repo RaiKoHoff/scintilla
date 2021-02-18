@@ -231,7 +231,7 @@ class ScintillaWin; 	// Forward declaration for COM interface subobjects
 
 /**
  */
-class FormatEnumerator : public IEnumFORMATETC {
+class FormatEnumerator final : public IEnumFORMATETC {
 	ULONG ref;
 	ULONG pos;
 	std::vector<CLIPFORMAT> formats;
@@ -254,7 +254,7 @@ public:
 
 /**
  */
-class DropSource : public IDropSource {
+class DropSource final : public IDropSource {
 public:
 	ScintillaWin *sci = nullptr;
 	DropSource() noexcept = default;
@@ -272,7 +272,7 @@ public:
 
 /**
  */
-class DataObject : public IDataObject {
+class DataObject final : public IDataObject {
 public:
 	ScintillaWin *sci = nullptr;
 	DataObject() noexcept = default;
@@ -297,7 +297,7 @@ public:
 
 /**
  */
-class DropTarget : public IDropTarget {
+class DropTarget final : public IDropTarget {
 public:
 	ScintillaWin *sci = nullptr;
 	DropTarget() noexcept = default;
@@ -434,7 +434,8 @@ class ScintillaWin final :
 	SetCoalescableTimerSig SetCoalescableTimerFn;
 #endif
 
-	unsigned int linesPerScroll;	///< Intellimouse support
+	UINT linesPerScroll;	///< Intellimouse support
+	UINT charsPerScroll;	///< Intellimouse support
 	int wheelDelta; ///< Wheel delta from roll
 
 	DPI_T dpi = { USER_DEFAULT_SCREEN_DPI, USER_DEFAULT_SCREEN_DPI };
@@ -599,9 +600,8 @@ class ScintillaWin final :
 	sptr_t GetTextLength() const noexcept;
 	sptr_t GetText(uptr_t wParam, sptr_t lParam) const;
 	Window::Cursor SCICALL ContextCursor(Point pt);
-#if SCI_EnablePopupMenu
 	sptr_t ShowContextMenu(unsigned int iMessage, uptr_t wParam, sptr_t lParam);
-#endif
+
 	void SizeWindow();
 	sptr_t MouseMessage(unsigned int iMessage, uptr_t wParam, sptr_t lParam);
 	sptr_t KeyMessage(unsigned int iMessage, uptr_t wParam, sptr_t lParam);
@@ -676,6 +676,7 @@ ScintillaWin::ScintillaWin(HWND hwnd) {
 #endif
 
 	linesPerScroll = 0;
+	charsPerScroll = 0;
 	wheelDelta = 0;   // Wheel delta from roll
 
 	dpi = GetWindowDPI(hwnd);
@@ -763,8 +764,8 @@ void ScintillaWin::Init() noexcept {
 
 void ScintillaWin::Finalise() noexcept {
 	ScintillaBase::Finalise();
-	for (TickReason tr = tickCaret; tr <= tickDwell; tr = static_cast<TickReason>(tr + 1)) {
-		FineTickerCancel(tr);
+	for (int tr = tickCaret; tr <= tickDwell; tr = tr + 1) {
+		FineTickerCancel(static_cast<TickReason>(tr));
 	}
 	SetIdle(false);
 #if defined(USE_D2D)
@@ -793,6 +794,7 @@ void ScintillaWin::EnsureRenderTarget(HDC hdc) noexcept {
 		// Create a Direct2D render target.
 #if 1
 		D2D1_RENDER_TARGET_PROPERTIES drtp;
+		ZeroMemory(&drtp, sizeof(D2D1_RENDER_TARGET_PROPERTIES));
 		drtp.type = D2D1_RENDER_TARGET_TYPE_DEFAULT;
 		drtp.pixelFormat.format = DXGI_FORMAT_UNKNOWN;
 		drtp.pixelFormat.alphaMode = D2D1_ALPHA_MODE_UNKNOWN;
@@ -818,6 +820,7 @@ void ScintillaWin::EnsureRenderTarget(HDC hdc) noexcept {
 
 		} else {
 			D2D1_HWND_RENDER_TARGET_PROPERTIES dhrtp;
+			ZeroMemory(&dhrtp, sizeof(D2D1_HWND_RENDER_TARGET_PROPERTIES));
 			dhrtp.hwnd = hw;
 			dhrtp.pixelSize = size;
 			dhrtp.presentOptions = (technology == SC_TECHNOLOGY_DIRECTWRITERETAIN) ?
@@ -884,7 +887,7 @@ bool ScintillaWin::DragThreshold(Point ptStart, Point ptNow) noexcept {
 	const XYPOSITION xMove = std::trunc(std::abs(ptDifference.x));
 	const XYPOSITION yMove = std::trunc(std::abs(ptDifference.y));
 	return (xMove > SystemMetricsForDpi(SM_CXDRAG, dpi.x)) ||
-		   (yMove > SystemMetricsForDpi(SM_CYDRAG, dpi.y));
+			(yMove > SystemMetricsForDpi(SM_CYDRAG, dpi.y));
 }
 
 void ScintillaWin::StartDrag() {
@@ -1457,16 +1460,16 @@ unsigned int SciMessageFromEM(unsigned int iMessage) noexcept {
 	case EM_LINEINDEX: return SCI_POSITIONFROMLINE;
 	case EM_LINESCROLL: return SCI_LINESCROLL;
 	case EM_REDO: return SCI_REDO;
-	case EM_UNDO: return SCI_UNDO;
-	case EM_SCROLL: return WM_VSCROLL;
 	case EM_REPLACESEL: return SCI_REPLACESEL;
+	case EM_SCROLL: return WM_VSCROLL;
 	case EM_SCROLLCARET: return SCI_SCROLLCARET;
 	case EM_SETREADONLY: return SCI_SETREADONLY;
+	case EM_UNDO: return SCI_UNDO;
 	case WM_CLEAR: return SCI_CLEAR;
 	case WM_COPY: return SCI_COPY;
 	case WM_CUT: return SCI_CUT;
-	case WM_SETTEXT: return SCI_SETTEXT;
 	case WM_PASTE: return SCI_PASTE;
+	case WM_SETTEXT: return SCI_SETTEXT;
 	case WM_UNDO: return SCI_UNDO;
 	}
 	return iMessage;
@@ -1590,13 +1593,13 @@ Window::Cursor ScintillaWin::ContextCursor(Point pt) {
 	return Window::Cursor::cursorText;
 }
 
-#if SCI_EnablePopupMenu
 sptr_t ScintillaWin::ShowContextMenu(unsigned int iMessage, uptr_t wParam, sptr_t lParam) {
 	Point pt = PointFromLParam(lParam);
 	POINT rpt = POINTFromPoint(pt);
 	::ScreenToClient(MainHWND(), &rpt);
 	const Point ptClient = PointFromPOINT(rpt);
 	if (ShouldDisplayPopup(ptClient)) {
+#if SCI_EnablePopupMenu
 		if ((pt.x == -1) && (pt.y == -1)) {
 			// Caused by keyboard so display menu near caret
 			pt = PointMainCaret();
@@ -1606,10 +1609,16 @@ sptr_t ScintillaWin::ShowContextMenu(unsigned int iMessage, uptr_t wParam, sptr_
 		}
 		ContextMenu(pt);
 		return 0;
-	}
-	return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
-}
+#else
+		return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
 #endif
+	}
+#if SCI_EnablePopupMenu
+	return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
+#else
+	return 0;
+#endif
+}
 
 void ScintillaWin::SizeWindow() {
 #if defined(USE_D2D)
@@ -1709,21 +1718,40 @@ sptr_t ScintillaWin::MouseMessage(unsigned int iMessage, uptr_t wParam, sptr_t l
 		// (A good idea for datazoom would be to "fold" or "unfold" details.
 		// i.e. if datazoomed out only class structures are visible, when datazooming in the control
 		// structures appear, then eventually the individual statements...)
-		if (wParam & (MK_SHIFT | MK_RBUTTON)) {
-			// send to client
-			return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
+		//@@@if (wParam & (MK_SHIFT | MK_RBUTTON)) {
+		if (wParam & MK_SHIFT) {
+			if (vs.wrapState != WrapMode::none || charsPerScroll == 0) {
+				return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
+			}
 		}
 
 		// Either SCROLL or ZOOM. We handle the wheel steppings calculation
 		wheelDelta -= GET_WHEEL_DELTA_WPARAM(wParam);
-		if (std::abs(wheelDelta) >= WHEEL_DELTA && linesPerScroll > 0) {
+		if (std::abs(wheelDelta) < WHEEL_DELTA) {
+			return 0;
+		}
+		if (wParam & MK_SHIFT) {
+			int charsToScroll = charsPerScroll;
+			if (charsPerScroll == WHEEL_PAGESCROLL) {
+				const PRectangle rcText = GetTextRectangle();
+				const int pageWidth = static_cast<int>(rcText.Width() * 2 / 3);
+				charsToScroll = pageWidth;
+			} else {
+				charsToScroll = 1 + static_cast<int>(std::max(charsToScroll, 1) * vs.aveCharWidth);
+			}
+			charsToScroll *= (wheelDelta / WHEEL_DELTA);
+			if (wheelDelta >= 0) {
+				wheelDelta = wheelDelta % WHEEL_DELTA;
+			} else {
+				wheelDelta = -(-wheelDelta % WHEEL_DELTA);
+			}
+			HorizontalScrollTo(xOffset + charsToScroll);
+		} else if (linesPerScroll > 0) {
 			Sci::Line linesToScroll = linesPerScroll;
 			if (linesPerScroll == WHEEL_PAGESCROLL) {
 				linesToScroll = LinesOnScreen() - 1;
 			}
-			if (linesToScroll == 0) {
-				linesToScroll = 1;
-			}
+			linesToScroll = std::max<Sci::Line>(linesToScroll, 1);
 			linesToScroll *= (wheelDelta / WHEEL_DELTA);
 			if (wheelDelta >= 0) {
 				wheelDelta = wheelDelta % WHEEL_DELTA;
@@ -1739,10 +1767,8 @@ sptr_t ScintillaWin::MouseMessage(unsigned int iMessage, uptr_t wParam, sptr_t l
 				} else {
 					KeyCommand(SCI_ZOOMOUT);
 				}
-				// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-				// send to main window too !
+				// send to main window too (trigger Zoom CallTip) !
 				::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
-				// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 			} else {
 				// Scroll
 				ScrollTo(topLine + linesToScroll);
@@ -2284,11 +2310,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 		break;
 
 		case WM_CONTEXTMENU:
-#if SCI_EnablePopupMenu
 			return ShowContextMenu(iMessage, wParam, lParam);
-#else
-			return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
-#endif
 
 		case WM_ERASEBKGND:
 			return 1;   // Avoid any background erasure as whole window painted.
@@ -3251,6 +3273,7 @@ LRESULT ScintillaWin::ImeOnReconvert(LPARAM lParam) {
 void ScintillaWin::GetIntelliMouseParameters() noexcept {
 	// This retrieves the number of lines per scroll as configured in the Mouse Properties sheet in Control Panel
 	::SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &linesPerScroll, 0);
+	::SystemParametersInfo(SPI_GETWHEELSCROLLCHARS, 0, &charsPerScroll, 0);
 }
 
 void ScintillaWin::CopyToGlobal(GlobalMemory &gmUnicode, const SelectionText &selectedText, CopyEncoding encoding) {
@@ -3341,7 +3364,7 @@ void ScintillaWin::CopyToClipboard(const SelectionText &selectedText) {
 }
 
 void ScintillaWin::ScrollMessage(WPARAM wParam) {
-	//DWORD dwStart = timeGetTime();
+	//DWORD dwStart = GetTickCount();
 	//Platform::DebugPrintf("Scroll %x %d\n", wParam, lParam);
 
 	SCROLLINFO sci = {};
@@ -3752,7 +3775,7 @@ STDMETHODIMP ScintillaWin::Drop(LPDATAOBJECT pIDataSource, DWORD grfKeyState, PO
 			NotifyURIDropped(putf.c_str());
 		} else {
 			FORMATETC fmtr = { cfColumnSelect, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
-			const bool isRectangular = (S_OK == pIDataSource->QueryGetData(&fmtr));
+			const bool isRectangular = S_OK == pIDataSource->QueryGetData(&fmtr);
 
 			POINT rpt = { pt.x, pt.y };
 			::ScreenToClient(MainHWND(), &rpt);
@@ -3824,7 +3847,7 @@ bool ScintillaWin::Register(HINSTANCE hInstance_) noexcept {
 	wndclass.lpszClassName = L"Scintilla";
 	scintillaClassAtom = ::RegisterClassExW(&wndclass);
 
-	const bool result = (0 != scintillaClassAtom);
+	const bool result = 0 != scintillaClassAtom;
 	return result;
 }
 
@@ -4002,7 +4025,7 @@ namespace Scintilla {
 }
 #else
 extern "C"
-sptr_t __stdcall Scintilla_DirectFunction(
+sptr_t SCI_METHOD Scintilla_DirectFunction(
 	ScintillaWin* sci, UINT iMessage, uptr_t wParam, sptr_t lParam) {
 	return sci->WndProc(iMessage, wParam, lParam);
 }
