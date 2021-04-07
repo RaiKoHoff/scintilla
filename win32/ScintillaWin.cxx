@@ -436,7 +436,8 @@ class ScintillaWin final :
 
 	UINT linesPerScroll;	///< Intellimouse support
 	UINT charsPerScroll;	///< Intellimouse support
-	int wheelDelta; ///< Wheel delta from roll
+	int wheelDelta;         ///< Wheel delta from roll
+	int wheelDeltaH;        ///< Wheel delta from horizontal wheel roll
 
 	DPI_T dpi = { USER_DEFAULT_SCREEN_DPI, USER_DEFAULT_SCREEN_DPI };
 	ReverseArrowCursor reverseArrowCursor;
@@ -479,7 +480,7 @@ class ScintillaWin final :
 	bool renderTargetValid;
 #endif
 
-	explicit ScintillaWin(HWND hwnd);
+	explicit ScintillaWin(HWND hwnd) noexcept;
 	// virtual ~ScintillaWin() in public section
 
 	void Init() noexcept;
@@ -664,7 +665,7 @@ HINSTANCE ScintillaWin::hInstance {};
 ATOM ScintillaWin::scintillaClassAtom = 0;
 ATOM ScintillaWin::callClassAtom = 0;
 
-ScintillaWin::ScintillaWin(HWND hwnd) {
+ScintillaWin::ScintillaWin(HWND hwnd) noexcept {
 
 	lastKeyDownConsumed = false;
 	lastHighSurrogateChar = 0;
@@ -677,7 +678,8 @@ ScintillaWin::ScintillaWin(HWND hwnd) {
 
 	linesPerScroll = 0;
 	charsPerScroll = 0;
-	wheelDelta = 0;   // Wheel delta from roll
+	wheelDelta  = 0;   // Wheel delta from roll
+	wheelDeltaH = 0;   // H-Wheel delta from roll
 
 	dpi = GetWindowDPI(hwnd);
 
@@ -1516,7 +1518,8 @@ UINT CodePageFromCharSet(DWORD characterSet, UINT documentCodePage) noexcept {
 }
 
 UINT ScintillaWin::CodePageOfDocument() const noexcept {
-	return CodePageFromCharSet(vs.styles[STYLE_DEFAULT].characterSet, pdoc->dbcsCodePage);
+	return pdoc->dbcsCodePage; // see SCI_GETCODEPAGE in Editor.cxx
+	//return CodePageFromCharSet(vs.styles[STYLE_DEFAULT].characterSet, pdoc->dbcsCodePage);
 }
 
 std::string ScintillaWin::EncodeWString(std::wstring_view wsv) {
@@ -1775,6 +1778,49 @@ sptr_t ScintillaWin::MouseMessage(unsigned int iMessage, uptr_t wParam, sptr_t l
 			}
 		}
 		return 0;
+
+	case WM_MOUSEHWHEEL:
+		if (!mouseWheelCaptures) {
+			// if the mouse wheel is not captured, test if the mouse
+			// pointer is over the editor window and if not, don't
+			// handle the message but pass it on.
+			RECT rc;
+			GetWindowRect(MainHWND(), &rc);
+			const POINT pt = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+			if (!PtInRect(&rc, pt)) {
+				return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
+			}
+		}
+
+		wheelDeltaH += GET_WHEEL_DELTA_WPARAM(wParam);
+		if (std::abs(wheelDeltaH) < WHEEL_DELTA) {
+			return 0;
+		}
+
+		if (vs.wrapState != WrapMode::none || charsPerScroll == 0) {
+			return ::DefWindowProc(MainHWND(), iMessage, wParam, lParam);
+		}
+		else {
+			int charsToScroll = charsPerScroll;
+			if (charsPerScroll == WHEEL_PAGESCROLL) {
+				const PRectangle rcText = GetTextRectangle();
+				const int pageWidth = static_cast<int>(rcText.Width() * 2 / 3);
+				charsToScroll = pageWidth;
+			}
+			else {
+				charsToScroll = 1 + static_cast<int>(std::max(charsToScroll, 1) * vs.aveCharWidth);
+			}
+			charsToScroll *= (wheelDeltaH / WHEEL_DELTA);
+			if (wheelDeltaH >= 0) {
+				wheelDeltaH = wheelDeltaH % WHEEL_DELTA;
+			}
+			else {
+				wheelDeltaH = -(-wheelDeltaH % WHEEL_DELTA);
+			}
+			HorizontalScrollTo(xOffset + charsToScroll);
+		}
+		return 0;
+
 	}
 	return 0;
 }
@@ -2145,7 +2191,7 @@ sptr_t ScintillaWin::SciMessage(unsigned int iMessage, uptr_t wParam, sptr_t lPa
 			(wParam == SC_TECHNOLOGY_DIRECTWRITE)) {
 			const int technologyNew = static_cast<int>(wParam);
 			if (technology != technologyNew) {
-				if (technologyNew > SC_TECHNOLOGY_DEFAULT) {
+				if (technologyNew != SC_TECHNOLOGY_DEFAULT) {
 #if defined(USE_D2D)
 					if (!LoadD2D())
 						// Failed to load Direct2D or DirectWrite so no effect
@@ -2158,6 +2204,7 @@ sptr_t ScintillaWin::SciMessage(unsigned int iMessage, uptr_t wParam, sptr_t lPa
 				}
 #if defined(USE_D2D)
 				DropRenderTarget();
+				view.bufferedDraw = technologyNew == SC_TECHNOLOGY_DEFAULT;
 #endif
 				technology = technologyNew;
 				// Invalidate all cached information including layout.
@@ -2253,6 +2300,7 @@ sptr_t ScintillaWin::WndProc(unsigned int iMessage, uptr_t wParam, sptr_t lParam
 		case WM_MOUSEMOVE:
 		case WM_MOUSELEAVE:
 		case WM_MOUSEWHEEL:
+		case WM_MOUSEHWHEEL:
 			return MouseMessage(iMessage, wParam, lParam);
 
 		case WM_SETCURSOR:
@@ -2656,16 +2704,14 @@ void ScintillaWin::NotifyURIDropped(const char *list) noexcept {
 	NotifyParent(scn);
 }
 
-class CaseFolderDBCS : public CaseFolderTable {
+class CaseFolderDBCS final : public CaseFolderTable {
 	// Allocate the expandable storage here so that it does not need to be reallocated
 	// for each call to Fold.
 	std::vector<wchar_t> utf16Mixed;
 	std::vector<wchar_t> utf16Folded;
 	UINT cp;
 public:
-	explicit CaseFolderDBCS(UINT cp_) noexcept : cp(cp_) {
-		StandardASCII();
-	}
+	explicit CaseFolderDBCS(UINT cp_) noexcept : cp(cp_) { }
 	size_t Fold(char *folded, size_t sizeFolded, const char *mixed, size_t lenMixed) override {
 		if ((lenMixed == 1) && (sizeFolded > 0)) {
 			folded[0] = mapping[static_cast<unsigned char>(mixed[0])];
@@ -2723,7 +2769,6 @@ CaseFolder *ScintillaWin::CaseFolderForEncoding() {
 	} else {
 		if (pdoc->dbcsCodePage == 0) {
 			CaseFolderTable *pcf = new CaseFolderTable();
-			pcf->StandardASCII();
 			// Only for single byte encodings
 			for (int i = 0x80; i < 0x100; i++) {
 				char sCharacter[2] = "A";
@@ -4083,9 +4128,6 @@ int Scintilla_RegisterClasses(void *hInstance) {
 	const bool result = ScintillaWin::Register(static_cast<HINSTANCE>(hInstance));
 	//@@@CharClassify::InitUnicodeData();
 	
-#ifdef SCI_LEXER
-	Scintilla_LinkLexers();
-#endif
 	return result;
 }
 
