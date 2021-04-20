@@ -78,9 +78,6 @@
 
 // >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
 #include <optional>
-//#include <memory>
-//#include <vector>
-//#include <string_view>
 // <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 namespace Scintilla {
@@ -105,7 +102,6 @@ struct FontParameters {
 	const char *faceName;
 	XYPOSITION size;
 	int weight;
-	int stretch;
 	bool italic;
 	int extraFontFlag;
 	int technology;
@@ -116,7 +112,6 @@ struct FontParameters {
 		const char *faceName_,
 		XYPOSITION size_=10,
 		int weight_=400,
-		int stretch_=5,
 		bool italic_=false,
 		int extraFontFlag_=0,
 		int technology_=0,
@@ -126,7 +121,6 @@ struct FontParameters {
 		faceName(faceName_),
 		size(size_),
 		weight(weight_),
-		stretch(stretch_),
 		italic(italic_),
 		extraFontFlag(extraFontFlag_),
 		technology(technology_),
@@ -152,6 +146,7 @@ public:
 
 class IScreenLine {
 public:
+	virtual ~IScreenLine() noexcept = default;
 	virtual std::string_view Text() const noexcept = 0;
 	virtual size_t Length() const noexcept = 0;
 	virtual size_t RepresentationCount() const = 0;
@@ -197,7 +192,7 @@ public:
 	static std::unique_ptr<Surface> Allocate(int technology);
 
 	virtual void Init(WindowID wid)=0;
-	virtual void Init(SurfaceID sid, WindowID wid)=0;
+	virtual void Init(SurfaceID sid, WindowID wid, bool printing = false)=0;
 	virtual std::unique_ptr<Surface> AllocatePixMap(int width, int height)=0;
 
 	virtual void SetMode(SurfaceMode mode)=0;
@@ -377,8 +372,6 @@ constexpr long LongFromTwoShorts(short a,short b) noexcept {
 }
 
 }
-
-
 
 } // namespace 
 
