@@ -37,16 +37,13 @@ MarginStyle::MarginStyle(int style_, int width_, int mask_) noexcept :
 	style(style_), width(width_), mask(mask_), sensitive(false), cursor(SC_CURSORREVERSEARROW) {
 }
 
-FontRealised::FontRealised() noexcept = default;
-
-FontRealised::~FontRealised() {
-}
-
-void FontRealised::Realise(Surface &surface, int zoomLevel, int technology, const FontSpecification &fs) {
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+void FontRealised::Realise(Surface &surface, int zoomLevel, int technology, const FontSpecification &fs, const char *localeName) {
 	PLATFORM_ASSERT(fs.fontName);
 	sizeZoomed = GetFontSizeZoomed(fs.size, zoomLevel);
 	const float deviceHeight = static_cast<float>(surface.DeviceHeightFont(sizeZoomed));
-	const FontParameters fp(fs.fontName, deviceHeight / SC_FONT_SIZE_MULTIPLIER, fs.weight, fs.italic, fs.extraFontFlag, technology, fs.characterSet);
+	const FontParameters fp(fs.fontName, deviceHeight / SC_FONT_SIZE_MULTIPLIER, fs.weight, fs.italic, fs.extraFontFlag, technology, fs.characterSet, localeName);
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	font = Font::Allocate(fp);
 
 	ascent = static_cast<unsigned int>(surface.Ascent(font.get()));
@@ -252,7 +249,9 @@ void ViewStyle::Init(size_t stylesSize_) {
 	marginInside = true;
 	CalculateMarginWidthAndMask();
 	textStart = marginInside ? fixedColumnWidth : leftMarginWidth;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
 	zoomLevel = 100;  /// @ 20018-09-06 Changed to percent
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	viewWhitespace = WhiteSpace::invisible;
 	tabDrawMode = TabDrawMode::longArrow;
 	whitespaceSize = 1;
@@ -283,35 +282,47 @@ void ViewStyle::Init(size_t stylesSize_) {
 	wrapVisualFlagsLocation = 0;
 	wrapVisualStartIndent = 0;
 	wrapIndentMode = SC_WRAPINDENT_FIXED;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	localeName = localeNameDefault;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 }
 
 void ViewStyle::Refresh(Surface &surface, int tabInChars) {
-	fonts.clear();
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	if (!fontsValid) {
+		fontsValid = true;
+
+fonts.clear();
+
+		// Apply the extra font flag which controls text drawing quality to each style.
+		for (Style &style : styles) {
+			style.extraFontFlag = extraFontFlag;
+		}
+	
+		// Create a FontRealised object for each unique font in the styles.
+		CreateAndAddFont(styles[STYLE_DEFAULT]);
+		for (const Style &style : styles) {
+			CreateAndAddFont(style);
+		}
+	
+		// Ask platform to allocate each unique font.
+		for (auto &font : fonts) {
+			font.second->Realise(surface, zoomLevel, technology, font.first, localeName.c_str());
+		}
+	
+		// Set the platform font handle and measurements for each style.
+		for (Style &style : styles) {
+			const FontRealised *fr = Find(style);
+			style.Copy(fr->font, *fr);
+		}
+
+		aveCharWidth = styles[STYLE_DEFAULT].aveCharWidth;
+		spaceWidth = styles[STYLE_DEFAULT].spaceWidth;
+	}
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 	selbar = Platform::Chrome();
 	selbarlight = Platform::ChromeHighlight();
-
-	// Apply the extra font flag which controls text drawing quality to each style.
-	for (Style &style : styles) {
-		style.extraFontFlag = extraFontFlag;
-	}
-
-	// Create a FontRealised object for each unique font in the styles.
-	CreateAndAddFont(styles[STYLE_DEFAULT]);
-	for (const Style &style : styles) {
-		CreateAndAddFont(style);
-	}
-
-	// Ask platform to allocate each unique font.
-	for (std::pair<const FontSpecification, std::unique_ptr<FontRealised>> &font : fonts) {
-		font.second->Realise(surface, zoomLevel, technology, font.first);
-	}
-
-	// Set the platform font handle and measurements for each style.
-	for (Style &style : styles) {
-		FontRealised *fr = Find(style);
-		style.Copy(fr->font, *fr);
-	}
 
 	indicatorsDynamic = std::any_of(indicators.cbegin(), indicators.cend(),
 		[](const Indicator &indicator) noexcept { return indicator.IsDynamic(); });
@@ -325,11 +336,9 @@ void ViewStyle::Refresh(Surface &surface, int tabInChars) {
 	maxAscent += extraAscent;
 	maxDescent += extraDescent;
 	lineHeight = maxAscent + maxDescent;
-	lineOverlap = lineHeight / 10;
-	if (lineOverlap < 2)
-		lineOverlap = 2;
-	if (lineOverlap > lineHeight)
-		lineOverlap = lineHeight;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	lineOverlap = std::clamp(lineHeight / 10, 2, lineHeight);
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 	someStylesProtected = std::any_of(styles.cbegin(), styles.cend(),
 		[](const Style &style) noexcept { return style.IsProtected(); });
@@ -337,9 +346,10 @@ void ViewStyle::Refresh(Surface &surface, int tabInChars) {
 	someStylesForceCase = std::any_of(styles.cbegin(), styles.cend(),
 		[](const Style &style) noexcept { return style.caseForce != Style::CaseForce::mixed; });
 
-	aveCharWidth = styles[STYLE_DEFAULT].aveCharWidth;
-	spaceWidth = styles[STYLE_DEFAULT].spaceWidth;
-	tabWidth = spaceWidth * tabInChars;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	//~tabWidth = spaceWidth * tabInChars;
+	tabWidth = aveCharWidth * tabInChars;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 	controlCharWidth = 0.0;
 	if (controlCharSymbol >= 32) {
@@ -372,6 +382,7 @@ void ViewStyle::EnsureStyle(size_t index) {
 }
 
 void ViewStyle::ResetDefaultStyle() {
+	fontsValid = false;
 	styles[STYLE_DEFAULT].Clear(ColourDesired(0,0,0),
 	        ColourDesired(0xff,0xff,0xff),
 	        Platform::DefaultFontSize() * SC_FONT_SIZE_MULTIPLIER, fontNames.Save(Platform::DefaultFont()),
@@ -380,6 +391,7 @@ void ViewStyle::ResetDefaultStyle() {
 }
 
 void ViewStyle::ClearStyles() {
+	fontsValid = false;
 	// Reset all styles to be like the default style
 	for (size_t i=0; i<styles.size(); i++) {
 		if (i != STYLE_DEFAULT) {
@@ -394,8 +406,16 @@ void ViewStyle::ClearStyles() {
 }
 
 void ViewStyle::SetStyleFontName(int styleIndex, const char *name) {
+  fontsValid = false;
 	styles[styleIndex].fontName = fontNames.Save(name);
 }
+
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+void ViewStyle::SetFontLocaleName(const char *name) {
+	fontsValid = false;
+	localeName = name;
+}
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 bool ViewStyle::ProtectionActive() const noexcept {
 	return someStylesProtected;
@@ -613,6 +633,7 @@ bool ViewStyle::ZoomIn() noexcept {
 		level = std::min(level, SC_MAX_ZOOM_LEVEL);
 		if (level != zoomLevel) {
 			zoomLevel = level;
+			fontsValid = false;
 			return true;
 		}
 	}
@@ -631,6 +652,7 @@ bool ViewStyle::ZoomOut() noexcept {
 		level = std::max(level, SC_MIN_ZOOM_LEVEL);
 		if (level != zoomLevel) {
 			zoomLevel = level;
+			fontsValid = false;
 			return true;
 		}
 	}
@@ -639,6 +661,7 @@ bool ViewStyle::ZoomOut() noexcept {
 // <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 void ViewStyle::AllocStyles(size_t sizeNew) {
+	fontsValid = false;
 	size_t i=styles.size();
 	styles.resize(sizeNew);
 	if (styles.size() > STYLE_DEFAULT) {
@@ -659,10 +682,10 @@ void ViewStyle::CreateAndAddFont(const FontSpecification &fs) {
 	}
 }
 
-FontRealised *ViewStyle::Find(const FontSpecification &fs) {
+FontRealised *ViewStyle::Find(const FontSpecification &fs) const {
 	if (!fs.fontName)	// Invalid specification so return arbitrary object
 		return fonts.begin()->second.get();
-	FontMap::iterator it = fonts.find(fs);
+	const auto it = fonts.find(fs);
 	if (it != fonts.end()) {
 		// Should always reach here since map was just set for all styles
 		return it->second.get();

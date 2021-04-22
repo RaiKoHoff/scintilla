@@ -30,14 +30,16 @@ public:
 class FontRealised : public FontMeasurements {
 public:
 	std::shared_ptr<Font> font;
-	FontRealised() noexcept;
+	FontRealised() noexcept = default;
 	// FontRealised objects can not be copied.
 	FontRealised(const FontRealised &) = delete;
 	FontRealised(FontRealised &&) = delete;
 	FontRealised &operator=(const FontRealised &) = delete;
 	FontRealised &operator=(FontRealised &&) = delete;
-	virtual ~FontRealised();
-	void Realise(Surface &surface, int zoomLevel, int technology, const FontSpecification &fs);
+	virtual ~FontRealised() noexcept = default;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	void Realise(Surface &surface, int zoomLevel, int technology, const FontSpecification &fs, const char *localeName);
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 };
 
 enum class IndentView {none, real, lookForward, lookBoth};
@@ -96,6 +98,9 @@ public:
 	std::vector<Indicator> indicators;
 	bool indicatorsDynamic;
 	bool indicatorsSetFore;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	bool fontsValid;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	int technology;
 	int lineHeight;
 	int lineOverlap;
@@ -130,7 +135,9 @@ public:
 	int fixedColumnWidth;	///< Total width of margins
 	bool marginInside;	///< true: margin included in text view, false: separate views
 	int textStart;	///< Starting x position of text within the view
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
 	int zoomLevel;  /// @ 2018-09-06 Changed to a percent value
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	WhiteSpace viewWhitespace;
 	TabDrawMode tabDrawMode;
 	int whitespaceSize;
@@ -175,6 +182,9 @@ public:
 	int wrapVisualFlagsLocation;
 	int wrapVisualStartIndent;
 	int wrapIndentMode; // SC_WRAPINDENT_FIXED, _SAME, _INDENT
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	std::string localeName;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 	ViewStyle();
 	ViewStyle(const ViewStyle &source);
@@ -192,6 +202,9 @@ public:
 	void ResetDefaultStyle();
 	void ClearStyles();
 	void SetStyleFontName(int styleIndex, const char *name);
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	void SetFontLocaleName(const char *name);
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	bool ProtectionActive() const noexcept;
 	int ExternalMarginWidth() const noexcept;
 	int MarginFromLocation(Point pt) const noexcept;
@@ -230,7 +243,7 @@ public:
 private:
 	void AllocStyles(size_t sizeNew);
 	void CreateAndAddFont(const FontSpecification &fs);
-	FontRealised *Find(const FontSpecification &fs);
+	FontRealised *Find(const FontSpecification &fs) const;
 	void FindMaxAscentDescent();
 };
 
