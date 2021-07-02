@@ -169,11 +169,11 @@
     <ClCompile>
       <AdditionalIncludeDirectories>include;src;../lexilla/inclide;../oniguruma/src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Disabled</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;USE_POSIX_API;USE_BINARY_COMPATIBLE_POSIX_API;WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;WIN32;_DEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <SmallerTypeCheck>false</SmallerTypeCheck>
@@ -183,9 +183,10 @@
       </EnableEnhancedInstructionSet>
       <FloatingPointModel>Precise</FloatingPointModel>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
       <MinimalRebuild>false</MinimalRebuild>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
@@ -202,17 +203,18 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Disabled</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;USE_POSIX_API;USE_BINARY_COMPATIBLE_POSIX_API;_WIN64;_DEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;_WIN64;_DEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <SmallerTypeCheck>false</SmallerTypeCheck>
       <StringPooling>true</StringPooling>
       <FloatingPointModel>Precise</FloatingPointModel>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <FunctionLevelLinking>false</FunctionLevelLinking>
       <EnableEnhancedInstructionSet />
       <MinimalRebuild>false</MinimalRebuild>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Lib>
       <TargetMachine>MachineX64</TargetMachine>
@@ -231,7 +233,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>MaxSpeed</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;USE_POSIX_API;USE_BINARY_COMPATIBLE_POSIX_API;WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -247,6 +249,7 @@
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <MinimalRebuild>false</MinimalRebuild>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
@@ -265,7 +268,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Disabled</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;USE_POSIX_API;USE_BINARY_COMPATIBLE_POSIX_API;WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;WIN32;NDEBUG;_WINDOWS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -278,6 +281,7 @@
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
@@ -294,7 +298,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>MaxSpeed</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;USE_POSIX_API;USE_BINARY_COMPATIBLE_POSIX_API;SCI_LEXER;_WIN64;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;STATIC_BUILD;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;SCI_LEXER;_WIN64;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;STATIC_BUILD;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -311,6 +315,7 @@
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <MinimalRebuild>false</MinimalRebuild>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Lib>
       <TargetMachine>
@@ -328,7 +333,7 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <Optimization>Disabled</Optimization>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;USE_POSIX_API;USE_BINARY_COMPATIBLE_POSIX_API;SCI_LEXER;_WIN64;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;STATIC_BUILD;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_WIN32_WINNT=0x601;WINVER=0x601;NTDDI_VERSION=0x06010000;_SCL_SECURE_NO_WARNINGS;NP3;NO_CXX11_REGEX;SCI_OWNREGEX;SCI_EMPTYCATALOGUE;ONIG_STATIC;SCI_LEXER;_WIN64;NDEBUG;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;STATIC_BUILD;USE_D2D;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <WarningLevel>Level4</WarningLevel>
       <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -340,6 +345,7 @@
       <IntrinsicFunctions>false</IntrinsicFunctions>
       <EnableEnhancedInstructionSet />
       <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Lib>
       <TargetMachine>MachineX64</TargetMachine>
@@ -361,8 +367,6 @@
     <ClCompile Include="oniguruma\src\regext.c" />
     <ClCompile Include="oniguruma\src\reggnu.c" />
     <ClCompile Include="oniguruma\src\regparse.c" />
-    <ClCompile Include="oniguruma\src\regposerr.c" />
-    <ClCompile Include="oniguruma\src\regposix.c" />
     <ClCompile Include="oniguruma\src\regsyntax.c" />
     <ClCompile Include="oniguruma\src\regtrav.c" />
     <ClCompile Include="oniguruma\src\regversion.c" />
@@ -379,8 +383,8 @@
     <ClCompile Include="src\CaseConvert.cxx" />
     <ClCompile Include="src\CaseFolder.cxx" />
     <ClCompile Include="src\CellBuffer.cxx" />
-    <ClCompile Include="src\CharacterCategory.cxx" />
-    <ClCompile Include="src\CharacterSet.cxx" />
+    <ClCompile Include="src\CharacterCategoryMap.cxx" />
+    <ClCompile Include="src\CharacterType.cxx" />
     <ClCompile Include="src\CharClassify.cxx" />
     <ClCompile Include="src\ContractionState.cxx" />
     <ClCompile Include="src\DBCS.cxx" />
@@ -410,9 +414,11 @@
     <ClCompile Include="win32\ScintillaWin.cxx" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\ScintillaMessages.h" />
+    <ClInclude Include="include\ScintillaStructures.h" />
+    <ClInclude Include="include\ScintillaTypes.h" />
     <ClInclude Include="oniguruma\src\config.h" />
     <ClInclude Include="oniguruma\src\oniggnu.h" />
-    <ClInclude Include="oniguruma\src\onigposix.h" />
     <ClInclude Include="oniguruma\src\oniguruma.h" />
     <ClInclude Include="oniguruma\src\regenc.h" />
     <ClInclude Include="oniguruma\src\regint.h" />
@@ -429,8 +435,8 @@
     <ClInclude Include="src\CaseConvert.h" />
     <ClInclude Include="src\CaseFolder.h" />
     <ClInclude Include="src\CellBuffer.h" />
-    <ClInclude Include="src\CharacterCategory.h" />
-    <ClInclude Include="src\CharacterSet.h" />
+    <ClInclude Include="src\CharacterCategoryMap.h" />
+    <ClInclude Include="src\CharacterType.h" />
     <ClInclude Include="src\CharClassify.h" />
     <ClInclude Include="src\ContractionState.h" />
     <ClInclude Include="src\DBCS.h" />
@@ -466,6 +472,9 @@
     <ClInclude Include="src\XPM.h" />
     <ClInclude Include="win32\PlatWin.h" />
     <ClInclude Include="win32\ScintillaWin.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="include\Scintilla.iface" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
