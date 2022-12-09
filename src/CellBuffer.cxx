@@ -24,6 +24,7 @@
 
 #include "Debugging.h"
 
+#include "Scintilla.h"
 #include "Position.h"
 #include "SplitVector.h"
 #include "Partitioning.h"

@@ -767,9 +767,9 @@ void Editor::MultipleSelectAdd(AddNumber addNumber) {
 			// Common case is that the selection is completely within the target but
 			// may also have overlap at start or end.
 			if (rangeMainSelection.end < rangeTarget.end)
-				searchRanges.push_back(Range(rangeMainSelection.end, rangeTarget.end));
+				searchRanges.emplace_back(rangeMainSelection.end, rangeTarget.end);
 			if (rangeTarget.start < rangeMainSelection.start)
-				searchRanges.push_back(Range(rangeTarget.start, rangeMainSelection.start));
+				searchRanges.emplace_back(rangeTarget.start, rangeMainSelection.start);
 		} else {
 			// No overlap
 			searchRanges.push_back(rangeTarget);
@@ -1846,8 +1846,10 @@ Sci::Position Editor::FormatRange(Scintilla::Message iMessage, Scintilla::uptr_t
 	if (iMessage == Message::FormatRange) {
 		RangeToFormat *pfr = static_cast<RangeToFormat *>(ptr);
 		CharacterRangeFull chrg{ pfr->chrg.cpMin,pfr->chrg.cpMax };
-		AutoSurface surface(pfr->hdc, this, Technology::Default);
-		AutoSurface surfaceMeasure(pfr->hdcTarget, this, Technology::Default);
+		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+		AutoSurface surface(pfr->hdc, this, Technology::Default, true);
+		AutoSurface surfaceMeasure(pfr->hdcTarget, this, Technology::Default, true);
+		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		if (!surface || !surfaceMeasure) {
 			return 0;
 		}
@@ -3917,15 +3919,19 @@ int Editor::KeyCommand(Message iMessage) {
 		AddChar('\f');
 		break;
 	case Message::ZoomIn:
-		if (vs.zoomLevel < 20) {
-			vs.zoomLevel++;
+		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+		if (vs.ZoomIn()) {
+			//vs.zoomLevel++;
+		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 			InvalidateStyleRedraw();
 			NotifyZoom();
 		}
 		break;
 	case Message::ZoomOut:
-		if (vs.zoomLevel > -10) {
-			vs.zoomLevel--;
+		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+		if (vs.ZoomOut()) {
+			//vs.zoomLevel--;
+		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 			InvalidateStyleRedraw();
 			NotifyZoom();
 		}
@@ -4338,10 +4344,14 @@ void Editor::SetDragPosition(SelectionPosition newPos) {
 		posDrop = newPos;
 	}
 	if (!(posDrag == newPos)) {
+		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+		int const slop_x = (caretPolicies.x.slop < 50) ? 50 : caretPolicies.x.slop;
+		int const slop_y = (caretPolicies.y.slop < 2) ? 2 : caretPolicies.y.slop;
 		const CaretPolicies dragCaretPolicies = {
-			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, 50),
-			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, 2)
+			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, slop_x),
+			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, slop_y)
 		};
+		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		MovedCaret(newPos, posDrag, true, dragCaretPolicies);
 
 		caret.on = true;
@@ -4361,7 +4371,7 @@ void Editor::DisplayCursor(Window::Cursor c) {
 		wMain.SetCursor(static_cast<Window::Cursor>(cursorMode));
 }
 
-bool Editor::DragThreshold(Point ptStart, Point ptNow) {
+bool Editor::DragThreshold(Point ptStart, Point ptNow) noexcept {
 	const Point ptDiff = ptStart - ptNow;
 	const XYPOSITION distanceSquared = ptDiff.x * ptDiff.x + ptDiff.y * ptDiff.y;
 	return distanceSquared > 16.0f;
@@ -4430,6 +4440,9 @@ void Editor::DropAt(SelectionPosition position, const char *value, size_t length
 				SetSelection(posAfterInsertion, position);
 			}
 		}
+		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+		EnsureCaretVisible();
+		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	} else if (inDragDrop == DragDrop::dragging) {
 		SetEmptySelection(position);
 	}
@@ -4802,6 +4815,9 @@ void Editor::SetHoverIndicatorPosition(Sci::Position position) {
 		}
 	}
 	if (hoverIndicatorPosPrev != hoverIndicatorPos) {
+		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+		TickFor(TickReason::dwell); // trigger SCN_DWELLSTART
+		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		Redraw();
 	}
 }
@@ -4959,7 +4975,13 @@ void Editor::ButtonMoveWithModifiers(Point pt, unsigned int, KeyMod modifiers) {
 				SetHotSpotRange(&pt);
 			} else {
 				if (hoverIndicatorPos != Sci::invalidPosition)
-					DisplayCursor(Window::Cursor::hand);
+				// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+				{
+					const bool ctrl = FlagSet(modifiers, KeyMod::Ctrl);
+					const bool alt = FlagSet(modifiers, KeyMod::Alt);
+					DisplayCursor(ctrl ? Window::Cursor::hand : (alt ? Window::Cursor::arrow : Window::Cursor::text));
+				}
+				// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 				else
 					DisplayCursor(Window::Cursor::text);
 				SetHotSpotRange(nullptr);
@@ -5249,12 +5271,12 @@ void Editor::QueueIdleWork(WorkItems items, Sci::Position upTo) {
 	workNeeded.Need(items, upTo);
 }
 
-int Editor::SupportsFeature(Supports feature) {
+int Editor::SupportsFeature(Scintilla::Supports feature) const noexcept {
 	AutoSurface surface(this);
 	return surface->SupportsFeature(feature);
 }
 
-bool Editor::PaintContains(PRectangle rc) {
+bool Editor::PaintContains(PRectangle rc) const noexcept {
 	if (rc.Empty()) {
 		return true;
 	} else {
@@ -5262,7 +5284,7 @@ bool Editor::PaintContains(PRectangle rc) {
 	}
 }
 
-bool Editor::PaintContainsMargin() {
+bool Editor::PaintContainsMargin() const noexcept {
 	if (HasMarginWindow()) {
 		// With separate margin view, paint of text view
 		// never contains margin.
@@ -5744,15 +5766,17 @@ std::unique_ptr<Surface> Editor::CreateMeasurementSurface() const {
 	return surf;
 }
 
-std::unique_ptr<Surface> Editor::CreateDrawingSurface(SurfaceID sid, std::optional<Scintilla::Technology> technologyOpt) const {
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+std::unique_ptr<Surface> Editor::CreateDrawingSurface(SurfaceID sid, std::optional<Scintilla::Technology> technologyOpt, bool printing) const {
 	if (!wMain.GetID()) {
 		return {};
 	}
 	std::unique_ptr<Surface> surf = Surface::Allocate(technologyOpt ? *technologyOpt : technology);
-	surf->Init(sid, wMain.GetID());
+	surf->Init(sid, wMain.GetID(), printing);
 	surf->SetMode(CurrentSurfaceMode());
 	return surf;
 }
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 Sci::Line Editor::WrapCount(Sci::Line line) {
 	AutoSurface surface(this);
@@ -5822,6 +5846,12 @@ void Editor::StyleSetMessage(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::StyleSetUnderline:
 		vs.styles[wParam].underline = lParam != 0;
 		break;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	// Added strike style, 2020-05-31
+	case Message::StyleSetStrike:
+		vs.styles[wParam].strike = lParam != 0;
+		break;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleSetCase:
 		vs.styles[wParam].caseForce = static_cast<Style::CaseForce>(lParam);
 		break;
@@ -5883,6 +5913,11 @@ sptr_t Editor::StyleGetMessage(Message iMessage, uptr_t wParam, sptr_t lParam) {
 		return StringResult(lParam, vs.styles[wParam].fontName);
 	case Message::StyleGetUnderline:
 		return vs.styles[wParam].underline ? 1 : 0;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	// Added strike style, 2020-05-31
+	case Message::StyleGetStrike:
+		return vs.styles[wParam].strike ? 1 : 0;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleGetCase:
 		return static_cast<int>(vs.styles[wParam].caseForce);
 	case Message::StyleGetCharacterSet:
@@ -6544,7 +6579,9 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 		break;
 
 	case Message::SetPrintMagnification:
-		view.printParameters.magnification = static_cast<int>(wParam);
+		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+		view.printParameters.magnification = std::clamp(static_cast<int>(wParam), SC_MIN_ZOOM_LEVEL, SC_MAX_ZOOM_LEVEL);
+		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		break;
 
 	case Message::GetPrintMagnification:
@@ -7066,6 +7103,14 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::GetIMEInteraction:
 		return static_cast<sptr_t>(imeInteraction);
 
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	case Message::IsIMEOpen:
+		return static_cast<sptr_t>(imeIsOpen);
+		
+	case Message::IsIMEModeCJK:
+		return static_cast<sptr_t>(imeIsInModeCJK);
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+
 	case Message::SetBidirectional:
 		// Message::SetBidirectional is implemented on platform subclasses if they support bidirectional text.
 		break;
@@ -7337,6 +7382,9 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::StyleSetSizeFractional:
 	case Message::StyleSetFont:
 	case Message::StyleSetUnderline:
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	case Message::StyleSetStrike:
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleSetCase:
 	case Message::StyleSetCharacterSet:
 	case Message::StyleSetVisible:
@@ -7357,6 +7405,9 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::StyleGetSizeFractional:
 	case Message::StyleGetFont:
 	case Message::StyleGetUnderline:
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	case Message::StyleGetStrike:
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleGetCase:
 	case Message::StyleGetCharacterSet:
 	case Message::StyleGetVisible:
@@ -8016,7 +8067,9 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 		break;
 
 	case Message::SetZoom: {
-			const int zoomLevel = static_cast<int>(wParam);
+			// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+			const int zoomLevel = std::clamp(static_cast<int>(wParam), SC_MIN_ZOOM_LEVEL, SC_MAX_ZOOM_LEVEL);
+			// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 			if (zoomLevel != vs.zoomLevel) {
 				vs.zoomLevel = zoomLevel;
 				InvalidateStyleRedraw();

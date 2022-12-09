@@ -69,6 +69,7 @@ Style::Style(const char *fontName_) noexcept :
 	back(0xff, 0xff, 0xff),
 	eolFilled(false),
 	underline(false),
+	strike(false),
 	caseForce(CaseForce::mixed),
 	visible(true),
 	changeable(true),

@@ -379,6 +379,14 @@ void ScintillaCall::SetIMEInteraction(Scintilla::IMEInteraction imeInteraction) 
 	Call(Message::SetIMEInteraction, static_cast<uintptr_t>(imeInteraction));
 }
 
+bool ScintillaCall::IsIMEOpen() {
+	return Call(Message::IsIMEOpen);
+}
+
+bool ScintillaCall::IsIMEModeCJK() {
+	return Call(Message::IsIMEModeCJK);
+}
+
 void ScintillaCall::MarkerDefine(int markerNumber, Scintilla::MarkerSymbol markerSymbol) {
 	Call(Message::MarkerDefine, markerNumber, static_cast<intptr_t>(markerSymbol));
 }
@@ -555,6 +563,10 @@ void ScintillaCall::StyleSetUnderline(int style, bool underline) {
 	Call(Message::StyleSetUnderline, style, underline);
 }
 
+void ScintillaCall::StyleSetStrike(int style, bool strike) {
+	Call(Message::StyleSetStrike, style, strike);
+}
+
 Colour ScintillaCall::StyleGetFore(int style) {
 	return static_cast<Colour>(Call(Message::StyleGetFore, style));
 }
@@ -589,6 +601,10 @@ bool ScintillaCall::StyleGetEOLFilled(int style) {
 
 bool ScintillaCall::StyleGetUnderline(int style) {
 	return Call(Message::StyleGetUnderline, style);
+}
+
+bool ScintillaCall::StyleGetStrike(int style) {
+	return Call(Message::StyleGetStrike, style);
 }
 
 CaseVisible ScintillaCall::StyleGetCase(int style) {

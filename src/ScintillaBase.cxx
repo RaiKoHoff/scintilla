@@ -152,10 +152,12 @@ int ScintillaBase::KeyCommand(Message iMessage) {
 			AutoCompleteMove(-ac.lb->GetVisibleRows());
 			return 0;
 		case Message::VCHome:
-			AutoCompleteMove(-5000);
+		case Message::HomeWrap:
+			AutoCompleteMove(-10000);
 			return 0;
 		case Message::LineEnd:
-			AutoCompleteMove(5000);
+		case Message::LineEndWrap:
+			AutoCompleteMove(10000);
 			return 0;
 		case Message::DeleteBack:
 			DelCharBack(true);
@@ -506,6 +508,10 @@ void ScintillaBase::CallTipClick() {
 	NotifyParent(scn);
 }
 
+
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+#if SCI_EnablePopupMenu
+
 bool ScintillaBase::ShouldDisplayPopup(Point ptInWindowCoordinates) const {
 	return (displayPopupMenu == PopUp::All ||
 		(displayPopupMenu == PopUp::Text && !PointInSelMargin(ptInWindowCoordinates)));
@@ -527,6 +533,10 @@ void ScintillaBase::ContextMenu(Point pt) {
 		popup.Show(pt, wMain);
 	}
 }
+
+#endif
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+
 
 void ScintillaBase::CancelModes() {
 	AutoCompleteCancel();
@@ -687,10 +697,11 @@ size_t LexState::PropGetExpanded(const char *key, char *result) const {
 	if (instance) {
 		const char *value = instance->PropertyGet(key);
 		if (value) {
+			size_t const len = strlen(value);
 			if (result) {
-				strcpy(result, value);
+				strcpy_s(result, len, value);
 			}
-			return strlen(value);
+			return len;
 		}
 	}
 	return 0;

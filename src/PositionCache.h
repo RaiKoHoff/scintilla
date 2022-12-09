@@ -126,16 +126,16 @@ struct ScreenLine : public IScreenLine {
 	void operator=(ScreenLine &&) = delete;
 	virtual ~ScreenLine();
 
-	std::string_view Text() const override;
-	size_t Length() const override;
+	std::string_view Text() const noexcept override;
+	size_t Length() const noexcept override;
 	size_t RepresentationCount() const override;
-	XYPOSITION Width() const override;
-	XYPOSITION Height() const override;
-	XYPOSITION TabWidth() const override;
-	XYPOSITION TabWidthMinimumPixels() const override;
-	const Font *FontOfPosition(size_t position) const override;
-	XYPOSITION RepresentationWidth(size_t position) const override;
-	XYPOSITION TabPositionAfter(XYPOSITION xPosition) const override;
+	XYPOSITION Width() const noexcept override;
+	XYPOSITION Height() const noexcept override;
+	XYPOSITION TabWidth() const noexcept override;
+	XYPOSITION TabWidthMinimumPixels() const noexcept override;
+	const Font *FontOfPosition(size_t position) const noexcept override;
+	XYPOSITION RepresentationWidth(size_t position) const noexcept override;
+	XYPOSITION TabPositionAfter(XYPOSITION xPosition) const noexcept override;
 };
 
 /**
@@ -164,6 +164,7 @@ public:
 	std::shared_ptr<LineLayout> Retrieve(Sci::Line lineNumber, Sci::Line lineCaret, int maxChars, int styleClock_,
 		Sci::Line linesOnScreen, Sci::Line linesInDoc);
 };
+
 
 class Representation {
 public:
@@ -259,7 +260,6 @@ public:
 };
 
 std::unique_ptr<IPositionCache> CreatePositionCache();
-
 }
 
 #endif

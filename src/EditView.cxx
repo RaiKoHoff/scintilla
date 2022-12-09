@@ -70,7 +70,9 @@ using namespace Scintilla;
 using namespace Scintilla::Internal;
 
 PrintParameters::PrintParameters() noexcept {
-	magnification = 0;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	magnification = 100;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	colourMode = PrintOption::Normal;
 	wrapState = Wrap::Word;
 }
@@ -464,6 +466,7 @@ void LayoutSegments(IPositionCache *pCache,
 void EditView::LayoutLine(const EditModel &model, Surface *surface, const ViewStyle &vstyle, LineLayout *ll, int width) {
 	if (!ll)
 		return;
+
 	const Sci::Line line = ll->LineNumber();
 	PLATFORM_ASSERT(line < model.pdoc->LinesTotal());
 	PLATFORM_ASSERT(ll->chars);
@@ -609,7 +612,6 @@ void EditView::LayoutLine(const EditModel &model, Surface *surface, const ViewSt
 			const TextSegment &ts = segments.back();
 			lastSegItalics = (!ts.representation) && ((ll->chars[ts.end() - 1] != ' ') && vstyle.styles[ll->styles[ts.start]].italic);
 		}
-
 		// Small hack to make lines that end with italics not cut off the edge of the last character
 		if (lastSegItalics) {
 			ll->positions[numCharsInLine] += vstyle.lastSegItalicsOffset;
@@ -2310,6 +2312,15 @@ void EditView::DrawForeground(Surface *surface, const EditModel &model, const Vi
 				rcUL.top = rcUL.top + vsDraw.maxAscent + 1;
 				rcUL.bottom = rcUL.top + 1;
 				surface->FillRectangleAligned(rcUL, Fill(textFore));
+			// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+			}
+			// Added strike style, 2020-05-31
+			if (vsDraw.styles[styleMain].strike) {
+				 PRectangle rcUL = rcSegment;
+				 rcUL.top = rcUL.top + std::ceil((rcUL.bottom - rcUL.top) / 2);
+				 rcUL.bottom = rcUL.top + 1;
+				 surface->FillRectangleAligned(rcUL, Fill(textFore));
+			// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 			}
 		} else if (rcSegment.left > rcLine.right) {
 			break;

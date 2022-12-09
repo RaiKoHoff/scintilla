@@ -133,6 +133,8 @@ public:
 	std::string FontLocale();
 	Scintilla::IMEInteraction IMEInteraction();
 	void SetIMEInteraction(Scintilla::IMEInteraction imeInteraction);
+	bool IsIMEOpen();
+	bool IsIMEModeCJK();
 	void MarkerDefine(int markerNumber, Scintilla::MarkerSymbol markerSymbol);
 	void MarkerSetFore(int markerNumber, Colour fore);
 	void MarkerSetBack(int markerNumber, Colour back);
@@ -177,6 +179,7 @@ public:
 	void StyleSetEOLFilled(int style, bool eolFilled);
 	void StyleResetDefault();
 	void StyleSetUnderline(int style, bool underline);
+	void StyleSetStrike(int style, bool strike);
 	Colour StyleGetFore(int style);
 	Colour StyleGetBack(int style);
 	bool StyleGetBold(int style);
@@ -186,6 +189,7 @@ public:
 	std::string StyleGetFont(int style);
 	bool StyleGetEOLFilled(int style);
 	bool StyleGetUnderline(int style);
+	bool StyleGetStrike(int style);
 	Scintilla::CaseVisible StyleGetCase(int style);
 	Scintilla::CharacterSet StyleGetCharacterSet(int style);
 	bool StyleGetVisible(int style);

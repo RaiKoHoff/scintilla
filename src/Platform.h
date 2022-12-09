@@ -81,6 +81,12 @@
 
 #endif
 
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+#include <optional>
+#include "ScintillaTypes.h"
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+
+
 namespace Scintilla::Internal {
 
 // Underlying the implementation of the platform classes are platform specific types.
@@ -97,7 +103,7 @@ typedef void *IdlerID;
  * Font management.
  */
 
-constexpr const char *localeNameDefault = "en-us";
+constexpr const char *localeNameDefault = "en-US";
 
 struct FontParameters {
 	const char *faceName;
@@ -147,23 +153,24 @@ public:
 
 class IScreenLine {
 public:
-	virtual std::string_view Text() const = 0;
-	virtual size_t Length() const = 0;
+	virtual ~IScreenLine() noexcept = default;
+	virtual std::string_view Text() const noexcept = 0;
+	virtual size_t Length() const noexcept = 0;
 	virtual size_t RepresentationCount() const = 0;
-	virtual XYPOSITION Width() const = 0;
-	virtual XYPOSITION Height() const = 0;
-	virtual XYPOSITION TabWidth() const = 0;
-	virtual XYPOSITION TabWidthMinimumPixels() const = 0;
-	virtual const Font *FontOfPosition(size_t position) const = 0;
-	virtual XYPOSITION RepresentationWidth(size_t position) const = 0;
-	virtual XYPOSITION TabPositionAfter(XYPOSITION xPosition) const = 0;
+	virtual XYPOSITION Width() const noexcept = 0;
+	virtual XYPOSITION Height() const noexcept = 0;
+	virtual XYPOSITION TabWidth() const noexcept = 0;
+	virtual XYPOSITION TabWidthMinimumPixels() const noexcept = 0;
+	virtual const Font *FontOfPosition(size_t position) const noexcept = 0;
+	virtual XYPOSITION RepresentationWidth(size_t position) const noexcept = 0;
+	virtual XYPOSITION TabPositionAfter(XYPOSITION xPosition) const noexcept = 0;
 };
 
 class IScreenLineLayout {
 public:
 	virtual ~IScreenLineLayout() noexcept = default;
 	virtual size_t PositionFromX(XYPOSITION xDistance, bool charPosition) = 0;
-	virtual XYPOSITION XFromPosition(size_t caretPosition) = 0;
+	virtual XYPOSITION XFromPosition(size_t caretPosition) noexcept = 0;
 	virtual std::vector<Interval> FindRangeIntervals(size_t start, size_t end) = 0;
 };
 
@@ -192,7 +199,9 @@ public:
 	static std::unique_ptr<Surface> Allocate(Scintilla::Technology technology);
 
 	virtual void Init(WindowID wid)=0;
-	virtual void Init(SurfaceID sid, WindowID wid)=0;
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	virtual void Init(SurfaceID sid, WindowID wid, bool printing = false)=0;
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	virtual std::unique_ptr<Surface> AllocatePixMap(int width, int height)=0;
 
 	virtual void SetMode(SurfaceMode mode)=0;
@@ -374,6 +383,6 @@ constexpr long LongFromTwoShorts(short a,short b) noexcept {
 
 }
 
-}
+} // namespace 
 
 #endif
