@@ -726,7 +726,16 @@ SCIContentView *ScintillaCocoa::ContentView() {
 Scintilla::Internal::Point ScintillaCocoa::GetVisibleOriginInMain() const {
 	NSScrollView *scrollView = ScrollContainer();
 	NSRect contentRect = scrollView.contentView.bounds;
-	return Point(static_cast<XYPOSITION>(contentRect.origin.x), static_cast<XYPOSITION>(contentRect.origin.y));
+	return Point(contentRect.origin.x, contentRect.origin.y);
+}
+
+//--------------------------------------------------------------------------------------------------
+
+/**
+ * Return the size of the client area which has been cached.
+ */
+Scintilla::Internal::Point ScintillaCocoa::ClientSize() const {
+	return sizeClient;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -738,10 +747,7 @@ Scintilla::Internal::Point ScintillaCocoa::GetVisibleOriginInMain() const {
  */
 PRectangle ScintillaCocoa::GetClientRectangle() const {
 	NSScrollView *scrollView = ScrollContainer();
-	NSSize size = scrollView.contentView.bounds.size;
-	Point origin = GetVisibleOriginInMain();
-	return PRectangle(origin.x, origin.y, static_cast<XYPOSITION>(origin.x+size.width),
-			  static_cast<XYPOSITION>(origin.y + size.height));
+	return NSRectToPRectangle(scrollView.contentView.bounds);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -772,7 +778,7 @@ Scintilla::Internal::Point ScintillaCocoa::ConvertPoint(NSPoint point) {
 	NSView *container = ContentView();
 	NSPoint result = [container convertPoint: point fromView: nil];
 	Scintilla::Internal::Point ptOrigin = GetVisibleOriginInMain();
-	return Point(static_cast<XYPOSITION>(result.x - ptOrigin.x), static_cast<XYPOSITION>(result.y - ptOrigin.y));
+	return Point(result.x - ptOrigin.x, result.y - ptOrigin.y);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1168,8 +1174,7 @@ void ScintillaCocoa::CTPaint(void *gc, NSRect rc) {
 
 void ScintillaCocoa::CallTipMouseDown(NSPoint pt) {
 	NSRect rectBounds = ((__bridge NSView *)(ct.wDraw.GetID())).bounds;
-	Point location(static_cast<XYPOSITION>(pt.x),
-		       static_cast<XYPOSITION>(rectBounds.size.height - pt.y));
+	Point location(pt.x, rectBounds.size.height - pt.y);
 	ct.MouseClick(location);
 	CallTipClick();
 }
@@ -2035,6 +2040,10 @@ bool ScintillaCocoa::SetScrollingSize() {
 
 void ScintillaCocoa::Resize() {
 	SetScrollingSize();
+
+	const PRectangle rcClient = GetClientRectangle();
+	sizeClient = Point(rcClient.Width(), rcClient.Height());
+
 	ChangeSize();
 }
 
