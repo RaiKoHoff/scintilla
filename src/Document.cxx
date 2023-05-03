@@ -448,6 +448,10 @@ Sci_Position SCI_METHOD Document::LineStart(Sci_Position line) const noexcept {
 	return cb.LineStart(line);
 }
 
+Range Document::LineRange(Sci::Line line) const noexcept {
+	return {cb.LineStart(line), cb.LineStart(line + 1)};
+}
+
 bool Document::IsLineStartPosition(Sci::Position position) const {
 	return LineStart(LineFromPosition(position)) == position;
 }
@@ -2876,20 +2880,13 @@ public:
 };
 
 // Define a way for the Regular Expression code to access the document
-class DocumentIndexer : public CharacterIndexer {
+class DocumentIndexer final : public CharacterIndexer {
 	Document *pdoc;
 	Sci::Position end;
 public:
 	DocumentIndexer(Document *pdoc_, Sci::Position end_) noexcept :
 		pdoc(pdoc_), end(end_) {
 	}
-
-	DocumentIndexer(const DocumentIndexer &) = delete;
-	DocumentIndexer(DocumentIndexer &&) = delete;
-	DocumentIndexer &operator=(const DocumentIndexer &) = delete;
-	DocumentIndexer &operator=(DocumentIndexer &&) = delete;
-
-	~DocumentIndexer() override = default;
 
 	char CharAt(Sci::Position index) const noexcept override {
 		if (index < 0 || index >= end)

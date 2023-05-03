@@ -148,10 +148,6 @@
      GTK sample which can be used to find bugs or prototype new features.</a><br />
      <a class="jump" href="Lexer.txt">A detailed description of how to write a lexer, including a
     discussion of folding</a>.<br />
-     <a class="jump" href="http://sphere.sourceforge.net/flik/docs/scintilla-container_lexer.html">
-     How to implement a lexer in the container</a>.<br />
-     <a class="jump" href="http://sphere.sourceforge.net/flik/docs/scintilla-folding.html">
-     How to implement folding</a>.<br />
      <a class="jump" href="https://github.com/geany/geany/files/5204338/Scintilla-var.aq-Tutorial.pdf">
      Beginner's Guide to lexing and folding</a>.<br />
      The <a class="jump" href="SciCoding.html">coding style</a> used in Scintilla and SciTE is
@@ -7982,7 +7978,7 @@ sptr_t CallScintilla(unsigned int iMessage, uptr_t wParam, sptr_t lParam){
 
     <p><b id="SCI_SETLAYOUTTHREADS">SCI_SETLAYOUTTHREADS(int threads)</b><br />
      <b id="SCI_GETLAYOUTTHREADS">SCI_GETLAYOUTTHREADS &rarr; int</b><br />
-     The time taken to measure text runs on wide lines can be improved by performing the task
+     The time taken to measure text runs on wide lines or when wrapping can be improved by performing the task
      concurrently on multiple threads when
      <a class="seealso" href="#SCI_SUPPORTSFEATURE">SCI_SUPPORTSFEATURE(SC_SUPPORTS_THREAD_SAFE_MEASURE_WIDTHS)</a>
      is available.

@@ -25,6 +25,10 @@
 #include <iterator>
 #include <memory>
 #include <chrono>
+#include <atomic>
+#include <mutex>
+#include <thread>
+#include <future>
 
 #include "ScintillaTypes.h"
 #include "ScintillaMessages.h"
@@ -274,6 +278,11 @@ Sci::Line Editor::TopLineOfMain() const noexcept {
 		return topLine;
 }
 
+Point Editor::ClientSize() const {
+	const PRectangle rcClient = GetClientRectangle();
+	return Point(rcClient.Width(), rcClient.Height());
+}
+
 PRectangle Editor::GetClientRectangle() const {
 	return wMain.GetClientPosition();
 }
@@ -290,8 +299,8 @@ PRectangle Editor::GetTextRectangle() const {
 }
 
 Sci::Line Editor::LinesOnScreen() const {
-	const PRectangle rcClient = GetClientRectangle();
-	const int htClient = static_cast<int>(rcClient.bottom - rcClient.top);
+	const Point sizeClient = ClientSize();
+	const int htClient = static_cast<int>(sizeClient.y);
 	//Platform::DebugPrintf("lines on screen = %d\n", htClient / lineHeight + 1);
 	return htClient / vs.lineHeight;
 }
@@ -724,9 +733,9 @@ void Editor::MultipleSelectAdd(AddNumber addNumber) {
 			// Common case is that the selection is completely within the target but
 			// may also have overlap at start or end.
 			if (rangeMainSelection.end < rangeTarget.end)
-				searchRanges.emplace_back(rangeMainSelection.end, rangeTarget.end);
+				searchRanges.push_back(Range(rangeMainSelection.end, rangeTarget.end));
 			if (rangeTarget.start < rangeMainSelection.start)
-				searchRanges.emplace_back(rangeTarget.start, rangeMainSelection.start);
+				searchRanges.push_back(Range(rangeTarget.start, rangeMainSelection.start));
 		} else {
 			// No overlap
 			searchRanges.push_back(rangeTarget);
@@ -1468,6 +1477,130 @@ bool Editor::WrapOneLine(Surface *surface, Sci::Line lineToWrap) {
 	return pcs->SetHeight(lineToWrap, linesWrapped);
 }
 
+namespace {
+
+// Lines less than lengthToMultiThread are laid out in blocks in parallel.
+// Longer lines are multi-threaded inside LayoutLine.
+// This allows faster processing when lines differ greatly in length and thus time to lay out.
+constexpr Sci::Position lengthToMultiThread = 4000;
+
+}
+
+bool Editor::WrapBlock(Surface *surface, Sci::Line lineToWrap, Sci::Line lineToWrapEnd) {
+
+	const size_t linesBeingWrapped = static_cast<size_t>(lineToWrapEnd - lineToWrap);
+
+	std::vector<int> linesAfterWrap(linesBeingWrapped);
+
+	size_t threads = std::min<size_t>({ linesBeingWrapped, view.maxLayoutThreads });
+	if (!surface->SupportsFeature(Supports::ThreadSafeMeasureWidths)) {
+		threads = 1;
+	}
+
+	const bool multiThreaded = threads > 1;
+
+	ElapsedPeriod epWrapping;
+
+	// Wrap all the short lines in multiple threads
+
+	// If only 1 thread needed then use the main thread, else spin up multiple
+	const std::launch policy = multiThreaded ? std::launch::async : std::launch::deferred;
+
+	std::atomic<size_t> nextIndex = 0;
+
+	// Lines that are less likely to be re-examined should not be read from or written to the cache.
+	const SignificantLines significantLines {
+		pdoc->SciLineFromPosition(sel.MainCaret()),
+		pcs->DocFromDisplay(topLine),
+		LinesOnScreen() + 1,
+		view.llc.GetLevel(),
+	};
+
+	// Protect the line layout cache from being accessed from multiple threads simultaneously
+	std::mutex mutexRetrieve;
+
+	std::vector<std::future<void>> futures;
+	for (size_t th = 0; th < threads; th++) {
+		std::future<void> fut = std::async(policy,
+			[=, &surface, &nextIndex, &linesAfterWrap, &mutexRetrieve]() {
+			// llTemporary is reused for non-significant lines, avoiding allocation costs.
+			std::shared_ptr<LineLayout> llTemporary = std::make_shared<LineLayout>(-1, 200);
+			while (true) {
+				const size_t i = nextIndex.fetch_add(1, std::memory_order_acq_rel);
+				if (i >= linesBeingWrapped) {
+					break;
+				}
+				const Sci::Line lineNumber = lineToWrap + i;
+				const Range rangeLine = pdoc->LineRange(lineNumber);
+				const Sci::Position lengthLine = rangeLine.Length();
+				if (lengthLine < lengthToMultiThread) {
+					std::shared_ptr<LineLayout> ll;
+					if (significantLines.LineMayCache(lineNumber)) {
+						std::lock_guard<std::mutex> guard(mutexRetrieve);
+						ll = view.RetrieveLineLayout(lineNumber, *this);
+					} else {
+						ll = llTemporary;
+						ll->ReSet(lineNumber, lengthLine);
+					}
+					view.LayoutLine(*this, surface, vs, ll.get(), wrapWidth, multiThreaded);
+					linesAfterWrap[i] = ll->lines;
+				}
+			}
+		});
+		futures.push_back(std::move(fut));
+	}
+	for (const std::future<void> &f : futures) {
+		f.wait();
+	}
+	// End of multiple threads
+
+	// Multiply duration by number of threads to produce (near) equivalence to duration if single threaded
+	const double durationShortLines = epWrapping.Duration(true);
+	const double durationShortLinesThreads = durationShortLines * threads;
+
+	// Wrap all the long lines in the main thread.
+	// LayoutLine may then multi-thread over segments in each line.
+
+	std::shared_ptr<LineLayout> llLarge = std::make_shared<LineLayout>(-1, 200);
+	for (size_t indexLarge = 0; indexLarge < linesBeingWrapped; indexLarge++) {
+		const Sci::Line lineNumber = lineToWrap + indexLarge;
+		const Range rangeLine = pdoc->LineRange(lineNumber);
+		const Sci::Position lengthLine = rangeLine.Length();
+		if (lengthLine >= lengthToMultiThread) {
+			std::shared_ptr<LineLayout> ll;
+			if (significantLines.LineMayCache(lineNumber)) {
+				ll = view.RetrieveLineLayout(lineNumber, *this);
+			} else {
+				ll = llLarge;
+				ll->ReSet(lineNumber, lengthLine);
+			}
+			view.LayoutLine(*this, surface, vs, ll.get(), wrapWidth);
+			linesAfterWrap[indexLarge] = ll->lines;
+		}
+	}
+
+	const double durationLongLines = epWrapping.Duration();
+	const size_t bytesBeingWrapped = pdoc->LineStart(lineToWrap + linesBeingWrapped) - pdoc->LineStart(lineToWrap);
+
+	size_t wrapsDone = 0;
+
+	for (size_t i = 0; i < linesBeingWrapped; i++) {
+		const Sci::Line lineNumber = lineToWrap + i;
+		int linesWrapped = linesAfterWrap[i];
+		if (vs.annotationVisible != AnnotationVisible::Hidden) {
+			linesWrapped += pdoc->AnnotationLines(lineNumber);
+		}
+		if (pcs->SetHeight(lineNumber, linesWrapped)) {
+			wrapsDone++;
+		}
+		wrapPending.Wrapped(lineNumber);
+	}
+
+	durationWrapOneByte.AddSample(bytesBeingWrapped, durationShortLinesThreads + durationLongLines);
+
+	return wrapsDone > 0;
+}
+
 // Perform  wrapping for a subset of the lines needing wrapping.
 // wsAll: wrap all lines which need wrapping in this single call
 // wsVisible: wrap currently visible lines
@@ -1549,16 +1682,7 @@ bool Editor::WrapLines(WrapScope ws) {
 			if (surface) {
 //Platform::DebugPrintf("Wraplines: scope=%0d need=%0d..%0d perform=%0d..%0d\n", ws, wrapPending.start, wrapPending.end, lineToWrap, lineToWrapEnd);
 
-				const size_t bytesBeingWrapped = pdoc->LineStart(lineToWrapEnd) - pdoc->LineStart(lineToWrap);
-				ElapsedPeriod epWrapping;
-				while (lineToWrap < lineToWrapEnd) {
-					if (WrapOneLine(surface, lineToWrap)) {
-						wrapOccurred = true;
-					}
-					wrapPending.Wrapped(lineToWrap);
-					lineToWrap++;
-				}
-				durationWrapOneByte.AddSample(bytesBeingWrapped, epWrapping.Duration());
+				wrapOccurred = WrapBlock(surface, lineToWrap, lineToWrapEnd);
 
 				goodTopLine = pcs->DisplayFromDoc(lineDocTop) + std::min(
 					subLineTop, static_cast<Sci::Line>(pcs->GetHeight(lineDocTop)-1));
@@ -1791,11 +1915,9 @@ Sci::Position Editor::FormatRange(Scintilla::Message iMessage, Scintilla::uptr_t
 	void *ptr = PtrFromSPtr(lParam);
 	if (iMessage == Message::FormatRange) {
 		RangeToFormat *pfr = static_cast<RangeToFormat *>(ptr);
-		CharacterRangeFull chrg{ pfr->chrg.cpMin,pfr->chrg.cpMax };
-		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-		AutoSurface surface(pfr->hdc, this, Technology::Default, true);
-		AutoSurface surfaceMeasure(pfr->hdcTarget, this, Technology::Default, true);
-		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+		const CharacterRangeFull chrg{ pfr->chrg.cpMin,pfr->chrg.cpMax };
+		AutoSurface surface(pfr->hdc, this, Technology::Default);
+		AutoSurface surfaceMeasure(pfr->hdcTarget, this, Technology::Default);
 		if (!surface || !surfaceMeasure) {
 			return 0;
 		}
@@ -3854,19 +3976,15 @@ int Editor::KeyCommand(Message iMessage) {
 		AddChar('\f');
 		break;
 	case Message::ZoomIn:
-		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-		if (vs.ZoomIn()) {
-			//vs.zoomLevel++;
-		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+		if (vs.zoomLevel < 20) {
+			vs.zoomLevel++;
 			InvalidateStyleRedraw();
 			NotifyZoom();
 		}
 		break;
 	case Message::ZoomOut:
-		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-		if (vs.ZoomOut()) {
-			//vs.zoomLevel--;
-		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+		if (vs.zoomLevel > -10) {
+			vs.zoomLevel--;
 			InvalidateStyleRedraw();
 			NotifyZoom();
 		}
@@ -4278,14 +4396,10 @@ void Editor::SetDragPosition(SelectionPosition newPos) {
 		posDrop = newPos;
 	}
 	if (!(posDrag == newPos)) {
-		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-		int const slop_x = (caretPolicies.x.slop < 50) ? 50 : caretPolicies.x.slop;
-		int const slop_y = (caretPolicies.y.slop < 2) ? 2 : caretPolicies.y.slop;
 		const CaretPolicies dragCaretPolicies = {
-			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, slop_x),
-			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, slop_y)
+			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, 50),
+			CaretPolicySlop(CaretPolicy::Slop | CaretPolicy::Strict | CaretPolicy::Even, 2)
 		};
-		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		MovedCaret(newPos, posDrag, true, dragCaretPolicies);
 
 		caret.on = true;
@@ -4305,7 +4419,7 @@ void Editor::DisplayCursor(Window::Cursor c) {
 		wMain.SetCursor(static_cast<Window::Cursor>(cursorMode));
 }
 
-bool Editor::DragThreshold(Point ptStart, Point ptNow) noexcept {
+bool Editor::DragThreshold(Point ptStart, Point ptNow) {
 	const Point ptDiff = ptStart - ptNow;
 	const XYPOSITION distanceSquared = ptDiff.x * ptDiff.x + ptDiff.y * ptDiff.y;
 	return distanceSquared > 16.0f;
@@ -4374,9 +4488,6 @@ void Editor::DropAt(SelectionPosition position, const char *value, size_t length
 				SetSelection(posAfterInsertion, position);
 			}
 		}
-		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-		EnsureCaretVisible();
-		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	} else if (inDragDrop == DragDrop::dragging) {
 		SetEmptySelection(position);
 	}
@@ -4749,9 +4860,6 @@ void Editor::SetHoverIndicatorPosition(Sci::Position position) {
 		}
 	}
 	if (hoverIndicatorPosPrev != hoverIndicatorPos) {
-		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-		TickFor(TickReason::dwell); // trigger SCN_DWELLSTART
-		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		Redraw();
 	}
 }
@@ -4909,13 +5017,7 @@ void Editor::ButtonMoveWithModifiers(Point pt, unsigned int, KeyMod modifiers) {
 				SetHotSpotRange(&pt);
 			} else {
 				if (hoverIndicatorPos != Sci::invalidPosition)
-				// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-				{
-					const bool ctrl = FlagSet(modifiers, KeyMod::Ctrl);
-					const bool alt = FlagSet(modifiers, KeyMod::Alt);
-					DisplayCursor(ctrl ? Window::Cursor::hand : (alt ? Window::Cursor::arrow : Window::Cursor::text));
-				}
-				// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+					DisplayCursor(Window::Cursor::hand);
 				else
 					DisplayCursor(Window::Cursor::text);
 				SetHotSpotRange(nullptr);
@@ -5205,12 +5307,12 @@ void Editor::QueueIdleWork(WorkItems items, Sci::Position upTo) {
 	workNeeded.Need(items, upTo);
 }
 
-int Editor::SupportsFeature(Scintilla::Supports feature) const noexcept {
+int Editor::SupportsFeature(Supports feature) {
 	AutoSurface surface(this);
 	return surface->SupportsFeature(feature);
 }
 
-bool Editor::PaintContains(PRectangle rc) const noexcept {
+bool Editor::PaintContains(PRectangle rc) {
 	if (rc.Empty()) {
 		return true;
 	} else {
@@ -5218,7 +5320,7 @@ bool Editor::PaintContains(PRectangle rc) const noexcept {
 	}
 }
 
-bool Editor::PaintContainsMargin() const noexcept {
+bool Editor::PaintContainsMargin() {
 	if (HasMarginWindow()) {
 		// With separate margin view, paint of text view
 		// never contains margin.
@@ -5712,17 +5814,15 @@ std::unique_ptr<Surface> Editor::CreateMeasurementSurface() const {
 	return surf;
 }
 
-// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-std::unique_ptr<Surface> Editor::CreateDrawingSurface(SurfaceID sid, std::optional<Scintilla::Technology> technologyOpt, bool printing) const {
+std::unique_ptr<Surface> Editor::CreateDrawingSurface(SurfaceID sid, std::optional<Scintilla::Technology> technologyOpt) const {
 	if (!wMain.GetID()) {
 		return {};
 	}
 	std::unique_ptr<Surface> surf = Surface::Allocate(technologyOpt ? *technologyOpt : technology);
-	surf->Init(sid, wMain.GetID(), printing);
+	surf->Init(sid, wMain.GetID());
 	surf->SetMode(CurrentSurfaceMode());
 	return surf;
 }
-// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 Sci::Line Editor::WrapCount(Sci::Line line) {
 	AutoSurface surface(this);
@@ -5812,12 +5912,6 @@ void Editor::StyleSetMessage(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::StyleSetUnderline:
 		vs.styles[wParam].underline = lParam != 0;
 		break;
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	// Added strike style, 2020-05-31
-	case Message::StyleSetStrike:
-		vs.styles[wParam].strike = lParam != 0;
-		break;
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleSetCase:
 		vs.styles[wParam].caseForce = static_cast<Style::CaseForce>(lParam);
 		break;
@@ -5879,11 +5973,6 @@ sptr_t Editor::StyleGetMessage(Message iMessage, uptr_t wParam, sptr_t lParam) {
 		return StringResult(lParam, vs.styles[wParam].fontName);
 	case Message::StyleGetUnderline:
 		return vs.styles[wParam].underline ? 1 : 0;
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	// Added strike style, 2020-05-31
-	case Message::StyleGetStrike:
-		return vs.styles[wParam].strike ? 1 : 0;
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleGetCase:
 		return static_cast<int>(vs.styles[wParam].caseForce);
 	case Message::StyleGetCharacterSet:
@@ -6530,9 +6619,7 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 		break;
 
 	case Message::SetPrintMagnification:
-		// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-		view.printParameters.magnification = std::clamp(static_cast<int>(wParam), SC_MIN_ZOOM_LEVEL, SC_MAX_ZOOM_LEVEL);
-		// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+		view.printParameters.magnification = static_cast<int>(wParam);
 		break;
 
 	case Message::GetPrintMagnification:
@@ -7052,14 +7139,6 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::GetIMEInteraction:
 		return static_cast<sptr_t>(imeInteraction);
 
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	case Message::IsIMEOpen:
-		return static_cast<sptr_t>(imeIsOpen);
-		
-	case Message::IsIMEModeCJK:
-		return static_cast<sptr_t>(imeIsInModeCJK);
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
-
 	case Message::SetBidirectional:
 		// Message::SetBidirectional is implemented on platform subclasses if they support bidirectional text.
 		break;
@@ -7331,9 +7410,6 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::StyleSetSizeFractional:
 	case Message::StyleSetFont:
 	case Message::StyleSetUnderline:
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	case Message::StyleSetStrike:
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleSetCase:
 	case Message::StyleSetCharacterSet:
 	case Message::StyleSetVisible:
@@ -7354,9 +7430,6 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 	case Message::StyleGetSizeFractional:
 	case Message::StyleGetFont:
 	case Message::StyleGetUnderline:
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	case Message::StyleGetStrike:
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	case Message::StyleGetCase:
 	case Message::StyleGetCharacterSet:
 	case Message::StyleGetVisible:
@@ -8013,9 +8086,7 @@ sptr_t Editor::WndProc(Message iMessage, uptr_t wParam, sptr_t lParam) {
 		break;
 
 	case Message::SetZoom: {
-			// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-			const int zoomLevel = std::clamp(static_cast<int>(wParam), SC_MIN_ZOOM_LEVEL, SC_MAX_ZOOM_LEVEL);
-			// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+			const int zoomLevel = static_cast<int>(wParam);
 			if (zoomLevel != vs.zoomLevel) {
 				vs.zoomLevel = zoomLevel;
 				InvalidateStyleRedraw();
