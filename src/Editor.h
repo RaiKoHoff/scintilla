@@ -69,17 +69,13 @@ class SelectionText {
 public:
 	bool rectangular;
 	bool lineCopy;
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	bool asBinary;
 	int codePage;
 	Scintilla::CharacterSet characterSet;
-	SelectionText() noexcept : rectangular(false), lineCopy(false), asBinary(false), codePage(0), characterSet(Scintilla::CharacterSet::Ansi) {}
+	SelectionText() noexcept : rectangular(false), lineCopy(false), codePage(0), characterSet(Scintilla::CharacterSet::Ansi) {}
 	void Clear() noexcept {
 		s.clear();
 		rectangular = false;
 		lineCopy = false;
-		asBinary = false;
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		codePage = 0;
 		characterSet = Scintilla::CharacterSet::Ansi;
 	}
@@ -439,7 +435,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	virtual void Cut();
 	void PasteRectangular(SelectionPosition pos, const char *ptr, Sci::Position len);
 	virtual void Copy() = 0;
-	virtual void CopyAllowLine();
+	void CopyAllowLine();
 	virtual bool CanPaste();
 	virtual void Paste() = 0;
 	void Clear();
@@ -452,7 +448,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	virtual void NotifyChange() = 0;
 	virtual void NotifyFocus(bool focus);
 	virtual void SetCtrlID(int identifier);
-	virtual int GetCtrlID() const noexcept { return ctrlID; }
+	virtual int GetCtrlID() { return ctrlID; }
 	virtual void NotifyParent(Scintilla::NotificationData scn) = 0;
 	virtual void NotifyStyleToNeeded(Sci::Position endStyleNeeded);
 	void NotifyChar(int ch, Scintilla::CharacterSource charSource);
@@ -521,7 +517,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	void CopyText(size_t length, const char *text);
 	void SetDragPosition(SelectionPosition newPos);
 	virtual void DisplayCursor(Window::Cursor c);
-	virtual bool DragThreshold(Point ptStart, Point ptNow) noexcept;
+	virtual bool DragThreshold(Point ptStart, Point ptNow);
 	virtual void StartDrag();
 	void DropAt(SelectionPosition position, const char *value, size_t lengthValue, bool moving, bool rectangular);
 	void DropAt(SelectionPosition position, const char *value, bool moving, bool rectangular);
@@ -564,9 +560,9 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	virtual void IdleWork();
 	virtual void QueueIdleWork(WorkItems items, Sci::Position upTo=0);
 
-	virtual int SupportsFeature(Scintilla::Supports feature) const noexcept;
-	virtual bool PaintContains(PRectangle rc) const noexcept;
-	bool PaintContainsMargin() const noexcept;
+	virtual int SupportsFeature(Scintilla::Supports feature);
+	virtual bool PaintContains(PRectangle rc);
+	bool PaintContainsMargin();
 	void CheckForChangeOutsidePaint(Range r);
 	void SetBraceHighlight(Sci::Position pos0, Sci::Position pos1, int matchStyle);
 
@@ -601,9 +597,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	virtual std::string UTF8FromEncoded(std::string_view encoded) const = 0;
 	virtual std::string EncodedFromUTF8(std::string_view utf8) const = 0;
 	virtual std::unique_ptr<Surface> CreateMeasurementSurface() const;
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	virtual std::unique_ptr<Surface> CreateDrawingSurface(SurfaceID sid, std::optional<Scintilla::Technology> technologyOpt = {}, bool printing = false) const;
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+	virtual std::unique_ptr<Surface> CreateDrawingSurface(SurfaceID sid, std::optional<Scintilla::Technology> technologyOpt = {}) const;
 
 	Sci::Line WrapCount(Sci::Line line);
 	void AddStyledText(const char *buffer, Sci::Position appendLength);
@@ -705,11 +699,9 @@ public:
 	AutoSurface(const Editor *ed) :
 		surf(ed->CreateMeasurementSurface())  {
 	}
-	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
-	AutoSurface(SurfaceID sid, Editor *ed, std::optional<Scintilla::Technology> technology = {}, bool printing = false) :
-		surf(ed->CreateDrawingSurface(sid, technology, printing)) {
+	AutoSurface(SurfaceID sid, const Editor *ed, std::optional<Scintilla::Technology> technology = {}) :
+		surf(ed->CreateDrawingSurface(sid, technology)) {
 	}
-	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 	// Deleted so AutoSurface objects can not be copied.
 	AutoSurface(const AutoSurface &) = delete;
 	AutoSurface(AutoSurface &&) = delete;
