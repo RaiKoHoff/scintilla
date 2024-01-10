@@ -30,20 +30,23 @@ using namespace Scintilla;
 using namespace Scintilla::Internal;
 
 // Test CellBuffer.
+bool Equal(const char *ptr, std::string_view sv) noexcept {
+	return memcmp(ptr, sv.data(), sv.length()) == 0;
+}
 
 TEST_CASE("CellBuffer") {
 
-	const char sText[] = "Scintilla";
-	const Sci::Position sLength = static_cast<Sci::Position>(strlen(sText));
+	constexpr std::string_view sText = "Scintilla";
+	constexpr Sci::Position sLength = sText.length();
 
 	CellBuffer cb(true, false);
 
 	SECTION("InsertOneLine") {
 		bool startSequence = false;
-		const char *cpChange = cb.InsertString(0, sText, sLength, startSequence);
+		const char *cpChange = cb.InsertString(0, sText.data(), sLength, startSequence);
 		REQUIRE(startSequence);
 		REQUIRE(sLength == cb.Length());
-		REQUIRE(memcmp(cpChange, sText, sLength) == 0);
+		REQUIRE(Equal(cpChange, sText));
 		REQUIRE(1 == cb.Lines());
 		REQUIRE(0 == cb.LineStart(0));
 		REQUIRE(0 == cb.LineFromPosition(0));
@@ -54,13 +57,13 @@ TEST_CASE("CellBuffer") {
 	}
 
 	SECTION("InsertTwoLines") {
-		const char sText2[] = "Two\nLines";
-		const Sci::Position sLength2 = static_cast<Sci::Position>(strlen(sText2));
+		constexpr std::string_view sText2 = "Two\nLines";
+		constexpr Sci::Position sLength2 = sText2.length();
 		bool startSequence = false;
-		const char *cpChange = cb.InsertString(0, sText2, sLength2, startSequence);
+		const char *cpChange = cb.InsertString(0, sText2.data(), sLength2, startSequence);
 		REQUIRE(startSequence);
 		REQUIRE(sLength2 == cb.Length());
-		REQUIRE(memcmp(cpChange, sText2, sLength2) == 0);
+		REQUIRE(Equal(cpChange, sText2));
 		REQUIRE(2 == cb.Lines());
 		REQUIRE(0 == cb.LineStart(0));
 		REQUIRE(0 == cb.LineFromPosition(0));
@@ -72,41 +75,93 @@ TEST_CASE("CellBuffer") {
 		REQUIRE(!cb.CanRedo());
 	}
 
+	SECTION("LineEnds") {
+		// Check that various line ends produce correct result from LineEnd.
+		cb.SetLineEndTypes(LineEndType::Unicode);
+		bool startSequence = false;
+		{
+			// Unix \n
+			constexpr std::string_view sText2 = "Two\nLines";
+			constexpr Sci::Position sLength2 = sText2.length();
+			cb.InsertString(0, sText2.data(), sLength2, startSequence);
+			REQUIRE(3 == cb.LineEnd(0));
+			REQUIRE(sLength2 == cb.LineEnd(1));
+			cb.DeleteChars(0, sLength2, startSequence);
+		}
+		{
+			// Windows \r\n
+			constexpr std::string_view sText2 = "Two\r\nLines";
+			constexpr Sci::Position sLength2 = sText2.length();
+			cb.InsertString(0, sText2.data(), sLength2, startSequence);
+			REQUIRE(3 == cb.LineEnd(0));
+			REQUIRE(sLength2 == cb.LineEnd(1));
+			cb.DeleteChars(0, sLength2, startSequence);
+		}
+		{
+			// Old macOS \r
+			constexpr std::string_view sText2 = "Two\rLines";
+			constexpr Sci::Position sLength2 = sText2.length();
+			cb.InsertString(0, sText2.data(), sLength2, startSequence);
+			REQUIRE(3 == cb.LineEnd(0));
+			REQUIRE(sLength2 == cb.LineEnd(1));
+			cb.DeleteChars(0, sLength2, startSequence);
+		}
+		{
+			// Unicode NEL is U+0085 \xc2\x85
+			constexpr std::string_view sText2 = "Two\xc2\x85Lines";
+			constexpr Sci::Position sLength2 = sText2.length();
+			cb.InsertString(0, sText2.data(), sLength2, startSequence);
+			REQUIRE(3 == cb.LineEnd(0));
+			REQUIRE(sLength2 == cb.LineEnd(1));
+			cb.DeleteChars(0, sLength2, startSequence);
+		}
+		{
+			// Unicode LS line separator is U+2028 \xe2\x80\xa8
+			constexpr std::string_view sText2 = "Two\xe2\x80\xa8Lines";
+			constexpr Sci::Position sLength2 = sText2.length();
+			cb.InsertString(0, sText2.data(), sLength2, startSequence);
+			REQUIRE(3 == cb.LineEnd(0));
+			REQUIRE(sLength2 == cb.LineEnd(1));
+			cb.DeleteChars(0, sLength2, startSequence);
+		}
+		cb.SetLineEndTypes(LineEndType::Default);
+	}
+
 	SECTION("UndoOff") {
 		REQUIRE(cb.IsCollectingUndo());
 		cb.SetUndoCollection(false);
 		REQUIRE(!cb.IsCollectingUndo());
 		bool startSequence = false;
-		const char *cpChange = cb.InsertString(0, sText, sLength, startSequence);
+		const char *cpChange = cb.InsertString(0, sText.data(), sLength, startSequence);
 		REQUIRE(!startSequence);
 		REQUIRE(sLength == cb.Length());
-		REQUIRE(memcmp(cpChange, sText, sLength) == 0);
+		REQUIRE(Equal(cpChange, sText));
 		REQUIRE(!cb.CanUndo());
 		REQUIRE(!cb.CanRedo());
 	}
 
 	SECTION("UndoRedo") {
-		const char sTextDeleted[] = "ci";
-		const char sTextAfterDeletion[] = "Sntilla";
+		constexpr std::string_view sTextDeleted = "ci";
+		constexpr std::string_view sTextAfterDeletion = "Sntilla";
 		bool startSequence = false;
-		const char *cpChange = cb.InsertString(0, sText, sLength, startSequence);
+		const char *cpChange = cb.InsertString(0, sText.data(), sLength, startSequence);
 		REQUIRE(startSequence);
 		REQUIRE(sLength == cb.Length());
-		REQUIRE(memcmp(cpChange, sText, sLength) == 0);
-		REQUIRE(memcmp(cb.BufferPointer(), sText, sLength) == 0);
+		REQUIRE(Equal(cpChange, sText));
+		REQUIRE(Equal(cb.BufferPointer(), sText));
 		REQUIRE(cb.CanUndo());
 		REQUIRE(!cb.CanRedo());
 		const char *cpDeletion = cb.DeleteChars(1, 2, startSequence);
 		REQUIRE(startSequence);
-		REQUIRE(memcmp(cpDeletion, sTextDeleted, strlen(sTextDeleted)) == 0);
-		REQUIRE(memcmp(cb.BufferPointer(), sTextAfterDeletion, strlen(sTextAfterDeletion)) == 0);
+		REQUIRE(Equal(cpDeletion, sTextDeleted));
+		REQUIRE(Equal(cb.BufferPointer(), sTextAfterDeletion));
 		REQUIRE(cb.CanUndo());
 		REQUIRE(!cb.CanRedo());
 
 		int steps = cb.StartUndo();
 		REQUIRE(steps == 1);
 		cb.PerformUndoStep();
-		REQUIRE(memcmp(cb.BufferPointer(), sText, sLength) == 0);
+		REQUIRE(Equal(cb.BufferPointer(), sText));
 		REQUIRE(cb.CanUndo());
 		REQUIRE(cb.CanRedo());
 
@@ -120,14 +175,14 @@ TEST_CASE("CellBuffer") {
 		steps = cb.StartRedo();
 		REQUIRE(steps == 1);
 		cb.PerformRedoStep();
-		REQUIRE(memcmp(cb.BufferPointer(), sText, sLength) == 0);
+		REQUIRE(Equal(cb.BufferPointer(), sText));
 		REQUIRE(cb.CanUndo());
 		REQUIRE(cb.CanRedo());
 
 		steps = cb.StartRedo();
 		REQUIRE(steps == 1);
 		cb.PerformRedoStep();
-		REQUIRE(memcmp(cb.BufferPointer(), sTextAfterDeletion, strlen(sTextAfterDeletion)) == 0);
+		REQUIRE(Equal(cb.BufferPointer(), sTextAfterDeletion));
 		REQUIRE(cb.CanUndo());
 		REQUIRE(!cb.CanRedo());
 
@@ -149,10 +204,226 @@ TEST_CASE("CellBuffer") {
 		cb.SetReadOnly(true);
 		REQUIRE(cb.IsReadOnly());
 		bool startSequence = false;
-		cb.InsertString(0, sText, sLength, startSequence);
+		cb.InsertString(0, sText.data(), sLength, startSequence);
 		REQUIRE(cb.Length() == 0);
 	}
 
+}
+
+bool Equal(const Action &a, ActionType at, Sci::Position position, std::string_view value) noexcept {
+	// Currently ignores mayCoalesce
+	if (a.at != at)
+		return false;
+	if (a.position != position)
+		return false;
+	if (a.lenData != static_cast<Sci::Position>(value.length()))
+		return false;
+	if (memcmp(a.data.get(), value.data(), a.lenData) != 0)
+		return false;
+	return true;
+}
+
+void TentativeUndo(UndoHistory &uh) {
+	const int steps = uh.TentativeSteps();
+	for (int step = 0; step < steps; step++) {
+		/* const Action &actionStep = */ uh.GetUndoStep();
+		uh.CompletedUndoStep();
+	}
+	uh.TentativeCommit();
+}
+
+TEST_CASE("UndoHistory") {
+
+	UndoHistory uh;
+
+	SECTION("Basics") {
+		REQUIRE(uh.IsSavePoint());
+		REQUIRE(uh.AfterSavePoint());
+		REQUIRE(!uh.BeforeSavePoint());
+		REQUIRE(!uh.BeforeReachableSavePoint());
+		REQUIRE(!uh.CanUndo());
+		REQUIRE(!uh.CanRedo());
+
+		bool startSequence = false;
+		const char *val = uh.AppendAction(ActionType::insert, 0, "ab", 2, startSequence, true);
+		REQUIRE(memcmp(val, "ab", 2) == 0);
+		REQUIRE(startSequence);
+		REQUIRE(!uh.IsSavePoint());
+		REQUIRE(uh.AfterSavePoint());
+		REQUIRE(uh.CanUndo());
+		REQUIRE(!uh.CanRedo());
+		val = uh.AppendAction(ActionType::remove, 0, "ab", 2, startSequence, true);
+		REQUIRE(memcmp(val, "ab", 2) == 0);
+		REQUIRE(startSequence);
+
+		// Undoing
+		{
+			const int steps = uh.StartUndo();
+			REQUIRE(steps == 1);
+			const Action &action = uh.GetUndoStep();
+			REQUIRE(Equal(action, ActionType::remove, 0, "ab"));
+			uh.CompletedUndoStep();
+		}
+		{
+			const int steps = uh.StartUndo();
+			REQUIRE(steps == 1);
+			const Action &action = uh.GetUndoStep();
+			REQUIRE(Equal(action, ActionType::insert, 0, "ab"));
+			uh.CompletedUndoStep();
+		}
+
+		REQUIRE(uh.IsSavePoint());
+
+		// Redoing
+		{
+			const int steps = uh.StartRedo();
+			REQUIRE(steps == 1);
+			const Action &action = uh.GetRedoStep();
+			REQUIRE(Equal(action, ActionType::insert, 0, "ab"));
+			uh.CompletedRedoStep();
+		}
+		{
+			const int steps = uh.StartRedo();
+			REQUIRE(steps == 1);
+			const Action &action = uh.GetRedoStep();
+			REQUIRE(Equal(action, ActionType::remove, 0, "ab"));
+			uh.CompletedRedoStep();
+		}
+
+		REQUIRE(!uh.IsSavePoint());
+	}
+
+	SECTION("Coalesce") {
+
+		bool startSequence = false;
+		const char *val = uh.AppendAction(ActionType::insert, 0, "ab", 2, startSequence, true);
+		REQUIRE(memcmp(val, "ab", 2) == 0);
+		REQUIRE(startSequence);
+		REQUIRE(!uh.IsSavePoint());
+		REQUIRE(uh.AfterSavePoint());
+		REQUIRE(uh.CanUndo());
+		REQUIRE(!uh.CanRedo());
+		val = uh.AppendAction(ActionType::insert, 2, "cd", 2, startSequence, true);
+		REQUIRE(memcmp(val, "cd", 2) == 0);
+		REQUIRE(!startSequence);
+
+		// Undoing
+		{
+			const int steps = uh.StartUndo();
+			REQUIRE(steps == 2);
+			const Action &action2 = uh.GetUndoStep();
+			REQUIRE(Equal(action2, ActionType::insert, 2, "cd"));
+			uh.CompletedUndoStep();
+			const Action &action1 = uh.GetUndoStep();
+			REQUIRE(Equal(action1, ActionType::insert, 0, "ab"));
+			uh.CompletedUndoStep();
+		}
+
+		REQUIRE(uh.IsSavePoint());
+
+		// Redoing
+		{
+			const int steps = uh.StartRedo();
+			REQUIRE(steps == 2);
+			const Action &action1 = uh.GetRedoStep();
+			REQUIRE(Equal(action1, ActionType::insert, 0, "ab"));
+			uh.CompletedRedoStep();
+			const Action &action2 = uh.GetRedoStep();
+			REQUIRE(Equal(action2, ActionType::insert, 2, "cd"));
+			uh.CompletedRedoStep();
+		}
+
+		REQUIRE(!uh.IsSavePoint());
+
+	}
+
+	SECTION("Grouping") {
+
+		uh.BeginUndoAction();
+
+		bool startSequence = false;
+		const char *val = uh.AppendAction(ActionType::insert, 0, "ab", 2, startSequence, true);
+		REQUIRE(memcmp(val, "ab", 2) == 0);
+		REQUIRE(startSequence);
+		REQUIRE(!uh.IsSavePoint());
+		REQUIRE(uh.AfterSavePoint());
+		REQUIRE(uh.CanUndo());
+		REQUIRE(!uh.CanRedo());
+		val = uh.AppendAction(ActionType::remove, 0, "ab", 2, startSequence, true);
+		REQUIRE(memcmp(val, "ab", 2) == 0);
+		REQUIRE(!startSequence);
+		val = uh.AppendAction(ActionType::insert, 0, "cde", 3, startSequence, true);
+		REQUIRE(memcmp(val, "cde", 3) == 0);
+		REQUIRE(!startSequence);
+
+		uh.EndUndoAction();
+
+		// Undoing
+		{
+			const int steps = uh.StartUndo();
+			REQUIRE(steps == 3);
+			const Action &action3 = uh.GetUndoStep();
+			REQUIRE(Equal(action3, ActionType::insert, 0, "cde"));
+			uh.CompletedUndoStep();
+			const Action &action2 = uh.GetUndoStep();
+			REQUIRE(Equal(action2, ActionType::remove, 0, "ab"));
+			uh.CompletedUndoStep();
+			const Action &action1 = uh.GetUndoStep();
+			REQUIRE(Equal(action1, ActionType::insert, 0, "ab"));
+			uh.CompletedUndoStep();
+		}
+
+		REQUIRE(uh.IsSavePoint());
+
+		// Redoing
+		{
+			const int steps = uh.StartRedo();
+			REQUIRE(steps == 3);
+			const Action &action1 = uh.GetRedoStep();
+			REQUIRE(Equal(action1, ActionType::insert, 0, "ab"));
+			uh.CompletedRedoStep();
+			const Action &action2 = uh.GetRedoStep();
+			REQUIRE(Equal(action2, ActionType::remove, 0, "ab"));
+			uh.CompletedRedoStep();
+			const Action &action3 = uh.GetRedoStep();
+			REQUIRE(Equal(action3, ActionType::insert, 0, "cde"));
+			uh.CompletedRedoStep();
+		}
+
+		REQUIRE(!uh.IsSavePoint());
+
+	}
+
+	SECTION("Tentative") {
+
+		REQUIRE(!uh.TentativeActive());
+		REQUIRE(uh.TentativeSteps() == -1);
+		uh.TentativeStart();
+		REQUIRE(uh.TentativeActive());
+		REQUIRE(uh.TentativeSteps() == 0);
+		bool startSequence = false;
+		uh.AppendAction(ActionType::insert, 0, "ab", 2, startSequence, true);
+		REQUIRE(uh.TentativeActive());
+		REQUIRE(uh.TentativeSteps() == 1);
+		REQUIRE(uh.CanUndo());
+		uh.TentativeCommit();
+		REQUIRE(!uh.TentativeActive());
+		REQUIRE(uh.TentativeSteps() == -1);
+		REQUIRE(uh.CanUndo());
+
+		// TentativeUndo is the other important operation but it is performed by Document so add a local equivalent
+		uh.TentativeStart();
+		uh.AppendAction(ActionType::remove, 0, "ab", 2, startSequence, false);
+		uh.AppendAction(ActionType::insert, 0, "ab", 2, startSequence, true);
+		REQUIRE(uh.TentativeActive());
+		// The first TentativeCommit didn't seal off the first action so it is still undoable
+		REQUIRE(uh.TentativeSteps() == 3);
+		REQUIRE(uh.CanUndo());
+		TentativeUndo(uh);
+		REQUIRE(!uh.TentativeActive());
+		REQUIRE(uh.TentativeSteps() == -1);
+		REQUIRE(uh.CanUndo());
+	}
 }
 
 TEST_CASE("CharacterIndex") {
@@ -187,8 +458,8 @@ TEST_CASE("CharacterIndex") {
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf32) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf32) == 1);
 
-		const char *hwair = "\xF0\x90\x8D\x88";
-		cb.InsertString(0, hwair, strlen(hwair), startSequence);
+		constexpr std::string_view hwair = "\xF0\x90\x8D\x88";
+		cb.InsertString(0, hwair.data(), hwair.length(), startSequence);
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 3);
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf32) == 0);
@@ -201,8 +472,8 @@ TEST_CASE("CharacterIndex") {
 		cb.AllocateLineCharacterIndex(LineCharacterIndexType::Utf16 | LineCharacterIndexType::Utf32);
 
 		bool startSequence = false;
-		const char *hwair = "a\xF0\x90\x8D\x88z";
-		cb.InsertString(0, hwair, strlen(hwair), startSequence);
+		constexpr std::string_view hwair = "a\xF0\x90\x8D\x88z";
+		cb.InsertString(0, hwair.data(), hwair.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 4);
@@ -231,8 +502,8 @@ TEST_CASE("CharacterIndex") {
 
 		bool startSequence = false;
 		// 3 lines of text containing 8 bytes
-		const char *data = "a\n\xF0\x90\x8D\x88\nz";
-		cb.InsertString(0, data, strlen(data), startSequence);
+		constexpr std::string_view data = "a\n\xF0\x90\x8D\x88\nz";
+		cb.InsertString(0, data.data(), data.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 2);
@@ -246,7 +517,7 @@ TEST_CASE("CharacterIndex") {
 
 		// Insert a new line at end -> "a\n\xF0\x90\x8D\x88\nz\n" 4 lines
 		// Last line empty
-		cb.InsertString(strlen(data), "\n", 1, startSequence);
+		cb.InsertString(data.length(), "\n", 1, startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 2);
@@ -261,7 +532,7 @@ TEST_CASE("CharacterIndex") {
 		REQUIRE(cb.IndexLineStart(4, LineCharacterIndexType::Utf32) == 6);
 
 		// Insert a new line before end -> "a\n\xF0\x90\x8D\x88\nz\n\n" 5 lines
-		cb.InsertString(strlen(data), "\n", 1, startSequence);
+		cb.InsertString(data.length(), "\n", 1, startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 2);
@@ -280,8 +551,8 @@ TEST_CASE("CharacterIndex") {
 		// Insert a valid 3-byte UTF-8 character at start ->
 		// "\xE2\x82\xACa\n\xF0\x90\x8D\x88\nz\n\n" 5 lines
 
-		const char *euro = "\xE2\x82\xAC";
-		cb.InsertString(0, euro, strlen(euro), startSequence);
+		constexpr std::string_view euro = "\xE2\x82\xAC";
+		cb.InsertString(0, euro.data(), euro.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 3);
@@ -301,8 +572,8 @@ TEST_CASE("CharacterIndex") {
 		// "\xE2\x82\xACa\n\EF\xF0\x90\x8D\x88\nz\n\n" 5 lines
 		// Should be treated as a single byte character
 
-		const char *lead = "\xEF";
-		cb.InsertString(5, lead, strlen(lead), startSequence);
+		constexpr std::string_view lead = "\xEF";
+		cb.InsertString(5, lead.data(), lead.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 3);
@@ -320,8 +591,8 @@ TEST_CASE("CharacterIndex") {
 		// byte before and the 2 bytes after also be each treated as singles
 		// so 3 more characters on line 0.
 
-		const char *ascii = "!";
-		cb.InsertString(1, ascii, strlen(ascii), startSequence);
+		constexpr std::string_view ascii = "!";
+		cb.InsertString(1, ascii.data(), ascii.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 6);
@@ -334,8 +605,8 @@ TEST_CASE("CharacterIndex") {
 		// Insert a NEL after the '!' to trigger the utf8 line end case ->
 		// "\xE2!\xC2\x85 \x82\xACa\n \EF\xF0\x90\x8D\x88\n z\n\n" 5 lines
 
-		const char *nel = "\xC2\x85";
-		cb.InsertString(2, nel, strlen(nel), startSequence);
+		constexpr std::string_view nel = "\xC2\x85";
+		cb.InsertString(2, nel.data(), nel.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 3);
@@ -354,11 +625,11 @@ TEST_CASE("CharacterIndex") {
 
 		bool startSequence = false;
 		// 3 lines of text containing 8 bytes
-		const char *data = "a\n\xF0\x90\x8D\x88\nz\nc";
-		cb.InsertString(0, data, strlen(data), startSequence);
+		constexpr std::string_view data = "a\n\xF0\x90\x8D\x88\nz\nc";
+		cb.InsertString(0, data.data(), data.length(), startSequence);
 
 		// Delete first 2 new lines -> "az\nc"
-		cb.DeleteChars(1, strlen(data) - 4, startSequence);
+		cb.DeleteChars(1, data.length() - 4, startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 3);
@@ -375,8 +646,8 @@ TEST_CASE("CharacterIndex") {
 
 		bool startSequence = false;
 		// 3 lines of text containing 8 bytes
-		const char *data = "a\n\xF0\x90\x8D\x88\nz";
-		cb.InsertString(0, data, strlen(data), startSequence);
+		constexpr std::string_view data = "a\n\xF0\x90\x8D\x88\nz";
+		cb.InsertString(0, data.data(), data.length(), startSequence);
 
 		// Delete lead byte from character on line 1 ->
 		// "a\n\x90\x8D\x88\nz"
@@ -409,8 +680,8 @@ TEST_CASE("CharacterIndex") {
 		// Restore lead byte from character on line 0 making a 4-byte character ->
 		// "a\xF0\x90\x8D\x88\nz"
 
-		const char *lead4 = "\xF0";
-		cb.InsertString(1, lead4, strlen(lead4), startSequence);
+		constexpr std::string_view lead4 = "\xF0";
+		cb.InsertString(1, lead4.data(), lead4.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 4);
@@ -427,13 +698,13 @@ TEST_CASE("CharacterIndex") {
 
 		bool startSequence = false;
 		// 2 lines of text containing 4 bytes
-		const char *data = "a\r\nb";
-		cb.InsertString(0, data, strlen(data), startSequence);
+		constexpr std::string_view data = "a\r\nb";
+		cb.InsertString(0, data.data(), data.length(), startSequence);
 
 		// 3 lines of text containing 5 bytes ->
 		// "a\r!\nb"
-		const char *ascii = "!";
-		cb.InsertString(2, ascii, strlen(ascii), startSequence);
+		constexpr std::string_view ascii = "!";
+		cb.InsertString(2, ascii.data(), ascii.length(), startSequence);
 
 		REQUIRE(cb.IndexLineStart(0, LineCharacterIndexType::Utf16) == 0);
 		REQUIRE(cb.IndexLineStart(1, LineCharacterIndexType::Utf16) == 2);
@@ -586,14 +857,14 @@ TEST_CASE("ChangeHistory") {
 		REQUIRE(il.DeletionCount(0, 2) == 0);
 		il.DeleteRangeSavingHistory(1, 1, true, false);
 		REQUIRE(il.DeletionCount(0,2) == 1);
-		const EditionSet at1 = {2};
+		const EditionSet at1 = { {2, 1} };
 		REQUIRE(il.DeletionsAt(1) == at1);
 		il.DeleteRangeSavingHistory(1, 1, false, false);
 		REQUIRE(il.DeletionCount(0,1) == 2);
-		const EditionSet at2 = { 2, 3 };
+		const EditionSet at2 = { {2, 1}, {3, 1} };
 		REQUIRE(il.DeletionsAt(1) == at2);
 		il.DeleteRangeSavingHistory(0, 1, false, false);
-		const EditionSet at3 = { 2, 3, 3 };
+		const EditionSet at3 = { {2, 1}, {3, 2} };
 		REQUIRE(il.DeletionsAt(0) == at3);
 		REQUIRE(il.DeletionCount(0,0) == 3);
 
@@ -633,6 +904,55 @@ TEST_CASE("ChangeHistory") {
 		}
 		REQUIRE(il.DeletionCount(0, 10) == 0);
 		REQUIRE(il.Length() == 10);
+
+	}
+
+	SECTION("Delete Contiguous Backward") {
+		// Deletes that touch
+		constexpr size_t length = 20;
+		constexpr size_t rounds = 8;
+		il.Insert(0, length, false, true);
+		REQUIRE(il.Length() == length);
+		il.SetSavePoint();
+		for (size_t i = 0; i < rounds; i++) {
+			il.DeleteRangeSavingHistory(9-i, 1, false, false);
+		}
+
+		constexpr size_t lengthAfterDeletions = length - rounds;
+		REQUIRE(il.Length() == lengthAfterDeletions);
+		REQUIRE(il.DeletionCount(0, lengthAfterDeletions) == rounds);
+
+		for (size_t j = 0; j < rounds; j++) {
+			il.UndoDeleteStep(2+j, 1, false);
+		}
+
+		// Restored to original
+		REQUIRE(il.DeletionCount(0, length) == 0);
+		REQUIRE(il.Length() == length);
+	}
+
+	SECTION("Delete Contiguous Forward") {
+		// Deletes that touch
+		constexpr size_t length = 20;
+		constexpr size_t rounds = 8;
+		il.Insert(0, length, false, true);
+		REQUIRE(il.Length() == length);
+		il.SetSavePoint();
+		for (size_t i = 0; i < rounds; i++) {
+			il.DeleteRangeSavingHistory(2,1, false, false);
+		}
+
+		constexpr size_t lengthAfterDeletions = length - rounds;
+		REQUIRE(il.Length() == lengthAfterDeletions);
+		REQUIRE(il.DeletionCount(0, lengthAfterDeletions) == rounds);
+
+		for (size_t j = 0; j < rounds; j++) {
+			il.UndoDeleteStep(2, 1, false);
+		}
+
+		// Restored to original
+		REQUIRE(il.Length() == length);
+		REQUIRE(il.DeletionCount(0, length) == 0);
 	}
 }
 
@@ -761,9 +1081,9 @@ TEST_CASE("CellBufferWithChangeHistory") {
 	SECTION("StraightUndoRedoSaveRevertRedo") {
 		CellBuffer cb(true, false);
 		cb.SetUndoCollection(false);
-		std::string sInsert = "abcdefghijklmnopqrstuvwxyz";
+		constexpr std::string_view sInsert = "abcdefghijklmnopqrstuvwxyz";
 		bool startSequence = false;
-		cb.InsertString(0, sInsert.c_str(), sInsert.length(), startSequence);
+		cb.InsertString(0, sInsert.data(), sInsert.length(), startSequence);
 		cb.SetUndoCollection(true);
 		cb.SetSavePoint();
 		cb.ChangeHistorySet(true);
@@ -900,9 +1220,9 @@ TEST_CASE("CellBufferWithChangeHistory") {
 	SECTION("Detached") {
 		CellBuffer cb(true, false);
 		cb.SetUndoCollection(false);
-		std::string sInsert = "abcdefghijklmnopqrstuvwxyz";
+		constexpr std::string_view sInsert = "abcdefghijklmnopqrstuvwxyz";
 		bool startSequence = false;
-		cb.InsertString(0, sInsert.c_str(), sInsert.length(), startSequence);
+		cb.InsertString(0, sInsert.data(), sInsert.length(), startSequence);
 		cb.SetUndoCollection(true);
 		cb.SetSavePoint();
 		cb.ChangeHistorySet(true);
