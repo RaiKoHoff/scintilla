@@ -36,9 +36,9 @@ extern "C" {
 #define ONIGURUMA
 #define ONIGURUMA_VERSION_MAJOR   6
 #define ONIGURUMA_VERSION_MINOR   9
-#define ONIGURUMA_VERSION_TEENY   8
+#define ONIGURUMA_VERSION_TEENY   9
 
-#define ONIGURUMA_VERSION_INT     60908
+#define ONIGURUMA_VERSION_INT     60909
 
 #ifndef P_
 #if defined(__STDC__) || defined(_WIN32)
@@ -189,9 +189,7 @@ ONIG_EXTERN OnigEncodingType OnigEncodingBIG5;
 ONIG_EXTERN OnigEncodingType OnigEncodingGB18030;
 #else // lean and mean
 ONIG_EXTERN OnigEncodingType OnigEncodingASCII;
-ONIG_EXTERN OnigEncodingType OnigEncodingASCII_CR;
 ONIG_EXTERN OnigEncodingType OnigEncodingUTF8;
-ONIG_EXTERN OnigEncodingType OnigEncodingUTF8_CR;
 #endif
 
 #if 0
@@ -228,9 +226,7 @@ ONIG_EXTERN OnigEncodingType OnigEncodingUTF8_CR;
 #define ONIG_ENCODING_GB18030      (&OnigEncodingGB18030)
 #else // lean and mean
 #define ONIG_ENCODING_ASCII        (&OnigEncodingASCII)
-#define ONIG_ENCODING_ASCII_CR     (&OnigEncodingASCII_CR)
 #define ONIG_ENCODING_UTF8         (&OnigEncodingUTF8)
-#define ONIG_ENCODING_UTF8_CR      (&OnigEncodingUTF8_CR)
 #endif
 
 #define ONIG_ENCODING_UNDEF    ((OnigEncoding )0)
