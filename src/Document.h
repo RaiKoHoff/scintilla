@@ -9,6 +9,10 @@
 #define DOCUMENT_H
 
 // >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+#if defined(__cplusplus)
+#include <map>
+#else
+#endif
 #include "ILoader.h"
 // <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
