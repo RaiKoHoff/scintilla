@@ -4519,7 +4519,7 @@ void Editor::DisplayCursor(Window::Cursor c) {
 		wMain.SetCursor(static_cast<Window::Cursor>(cursorMode));
 }
 
-bool Editor::DragThreshold(Point ptStart, Point ptNow) {
+bool Editor::DragThreshold(Point ptStart, Point ptNow) noexcept {
 	const Point ptDiff = ptStart - ptNow;
 	const XYPOSITION distanceSquared = ptDiff.x * ptDiff.x + ptDiff.y * ptDiff.y;
 	return distanceSquared > 16.0f;
@@ -5449,19 +5449,19 @@ void Editor::QueueIdleWork(WorkItems items, Sci::Position upTo) {
 	workNeeded.Need(items, upTo);
 }
 
-int Editor::SupportsFeature(Supports feature) {
+int Editor::SupportsFeature(Supports feature) const noexcept {
 	AutoSurface surface(this);
 	return surface->SupportsFeature(feature);
 }
 
-bool Editor::PaintContains(PRectangle rc) {
+bool Editor::PaintContains(PRectangle rc) const noexcept {
 	if (rc.Empty()) {
 		return true;
 	}
 	return rcPaint.Contains(rc);
 }
 
-bool Editor::PaintContainsMargin() {
+bool Editor::PaintContainsMargin() const noexcept {
 	if (HasMarginWindow()) {
 		// With separate margin view, paint of text view
 		// never contains margin.

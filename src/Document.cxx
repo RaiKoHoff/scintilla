@@ -198,7 +198,7 @@ int SCI_METHOD Document::AddRef() noexcept {
 
 // Decrease reference count and return its previous value.
 // Delete the document if reference count reaches zero.
-int SCI_METHOD Document::Release() {
+int SCI_METHOD Document::Release() noexcept{
 	const int curRefCount = --refCount;
 	if (curRefCount == 0)
 		delete this;
@@ -503,7 +503,7 @@ int Document::MarkerHandleFromLine(Sci::Line line, int which) const noexcept {
 	return Markers()->HandleFromLine(line, which);
 }
 
-Sci_Position SCI_METHOD Document::LineStart(Sci_Position line) const {
+Sci_Position SCI_METHOD Document::LineStart(Sci_Position line) const noexcept {
 	return cb.LineStart(line);
 }
 
@@ -523,14 +523,14 @@ int SCI_METHOD Document::DEVersion() const noexcept {
 	return deRelease0;
 }
 
-void SCI_METHOD Document::SetErrorStatus(int status) {
+void SCI_METHOD Document::SetErrorStatus(int status) noexcept {
 	// Tell the watchers an error has occurred.
 	for (const WatcherWithUserData &watcher : watchers) {
 		watcher.watcher->NotifyErrorOccurred(this, watcher.userData, static_cast<Status>(status));
 	}
 }
 
-Sci_Position SCI_METHOD Document::LineFromPosition(Sci_Position pos) const {
+Sci_Position SCI_METHOD Document::LineFromPosition(Sci_Position pos) const noexcept {
 	return cb.LineFromPosition(pos);
 }
 
@@ -602,7 +602,7 @@ int SCI_METHOD Document::SetLevel(Sci_Position line, int level) {
 	return prev;
 }
 
-int SCI_METHOD Document::GetLevel(Sci_Position line) const {
+int SCI_METHOD Document::GetLevel(Sci_Position line) const noexcept {
 	return Levels()->GetLevel(line);
 }
 
@@ -1015,7 +1015,7 @@ CharacterExtracted Document::CharacterBefore(Sci::Position position) const noexc
 }
 
 // Return -1  on out-of-bounds
-Sci_Position SCI_METHOD Document::GetRelativePosition(Sci_Position positionStart, Sci_Position characterOffset) const {
+Sci_Position SCI_METHOD Document::GetRelativePosition(Sci_Position positionStart, Sci_Position characterOffset) const noexcept {
 	Sci::Position pos = positionStart;
 	if (dbcsCodePage) {
 		const int increment = (characterOffset > 0) ? 1 : -1;
@@ -1055,7 +1055,7 @@ Sci::Position Document::GetRelativePositionUTF16(Sci::Position positionStart, Sc
 	return pos;
 }
 
-int SCI_METHOD Document::GetCharacterAndWidth(Sci_Position position, Sci_Position *pWidth) const {
+int SCI_METHOD Document::GetCharacterAndWidth(Sci_Position position, Sci_Position *pWidth) const noexcept {
 	int bytesInCharacter = 1;
 	const unsigned char leadByte = cb.UCharAt(position);
 	int character = leadByte;
@@ -1089,11 +1089,11 @@ int SCI_METHOD Document::GetCharacterAndWidth(Sci_Position position, Sci_Positio
 	return character;
 }
 
-int SCI_METHOD Document::CodePage() const {
+int SCI_METHOD Document::CodePage() const noexcept {
 	return dbcsCodePage;
 }
 
-bool SCI_METHOD Document::IsDBCSLeadByte(char ch) const {
+bool SCI_METHOD Document::IsDBCSLeadByte(char ch) const noexcept {
 	// Used by lexers so must match IDocument method exactly
 	return IsDBCSLeadByteNoExcept(ch);
 }
@@ -1558,7 +1558,7 @@ IDocumentEditable *Document::AsDocumentEditable() noexcept {
 	return static_cast<IDocumentEditable *>(this);
 }
 
-void *SCI_METHOD Document::ConvertToDocument() {
+void * SCI_METHOD Document::ConvertToDocument() noexcept {
 	return AsDocumentEditable();
 }
 
@@ -1907,7 +1907,7 @@ std::string Document::TransformLineEnds(const char *s, size_t len, EndOfLine eol
 void Document::ConvertLineEnds(EndOfLine eolModeSet) {
 	UndoGroup ug(this);
 
-	const Sci::Position length = Length();
+	Sci::Position length = Length();
 	for (Sci::Position pos = 0; pos < length; pos++) {
 		const char ch = cb.CharAt(pos);
 		if (ch == '\r') {
@@ -1915,8 +1915,10 @@ void Document::ConvertLineEnds(EndOfLine eolModeSet) {
 				// CRLF
 				if (eolModeSet == EndOfLine::Cr) {
 					DeleteChars(pos + 1, 1); // Delete the LF
+					--length;
 				} else if (eolModeSet == EndOfLine::Lf) {
 					DeleteChars(pos, 1); // Delete the CR
+					--length;
 				} else {
 					pos++;
 				}
@@ -1924,6 +1926,7 @@ void Document::ConvertLineEnds(EndOfLine eolModeSet) {
 				// CR
 				if (eolModeSet == EndOfLine::CrLf) {
 					pos += InsertString(pos + 1, "\n", 1); // Insert LF
+					++length;
 				} else if (eolModeSet == EndOfLine::Lf) {
 					pos += InsertString(pos, "\n", 1); // Insert LF
 					DeleteChars(pos, 1); // Delete CR
@@ -1934,6 +1937,7 @@ void Document::ConvertLineEnds(EndOfLine eolModeSet) {
 			// LF
 			if (eolModeSet == EndOfLine::CrLf) {
 				pos += InsertString(pos, "\r", 1); // Insert CR
+				++length;
 			} else if (eolModeSet == EndOfLine::Cr) {
 				pos += InsertString(pos, "\r", 1); // Insert CR
 				DeleteChars(pos, 1); // Delete LF
@@ -2563,7 +2567,7 @@ int Document::CharacterCategoryOptimization() const noexcept {
 	return charMap.Size();
 }
 
-void SCI_METHOD Document::StartStyling(Sci_Position position) {
+void SCI_METHOD Document::StartStyling(Sci_Position position) noexcept {
 	endStyled = position;
 }
 
@@ -2677,7 +2681,7 @@ int SCI_METHOD Document::SetLineState(Sci_Position line, int state) {
 	return statePrevious;
 }
 
-int SCI_METHOD Document::GetLineState(Sci_Position line) const {
+int SCI_METHOD Document::GetLineState(Sci_Position line) const noexcept {
 	return States()->GetLineState(line);
 }
 
@@ -2811,7 +2815,7 @@ void Document::IncrementStyleClock() noexcept {
 	styleClock = (styleClock + 1) % 0x100000;
 }
 
-void SCI_METHOD Document::DecorationSetCurrentIndicator(int indicator) {
+void SCI_METHOD Document::DecorationSetCurrentIndicator(int indicator) noexcept {
 	decorations->SetCurrentIndicator(indicator);
 }
 

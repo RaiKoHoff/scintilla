@@ -199,13 +199,14 @@ int SystemMetricsForDpi(int nIndex, UINT dpi) noexcept {
 	return value;
 }
 
-void AdjustWindowRectForDpi(LPRECT lpRect, DWORD dwStyle, UINT dpi) noexcept {
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+BOOL AdjustWindowRectForDpi(LPRECT lpRect, DWORD dwStyle, DWORD dwExStyle, UINT dpi)  noexcept {
 	if (fnAdjustWindowRectExForDpi) {
-		fnAdjustWindowRectExForDpi(lpRect, dwStyle, false, WS_EX_WINDOWEDGE, dpi);
-	} else {
-		::AdjustWindowRectEx(lpRect, dwStyle, false, WS_EX_WINDOWEDGE);
+		return fnAdjustWindowRectExForDpi(lpRect, dwStyle, FALSE, dwExStyle, dpi);
 	}
+	return ::AdjustWindowRectEx(lpRect, dwStyle, FALSE, dwExStyle);
 }
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 namespace {
 

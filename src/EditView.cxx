@@ -2309,6 +2309,14 @@ void EditView::DrawForeground(Surface *surface, const EditModel &model, const Vi
 				}
 				surface->FillRectangleAligned(rcUL, colourUnderline);
 			}
+			// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+			else if (vsDraw.styles[styleMain].strike) {
+				PRectangle rcUL = rcSegment;
+				rcUL.top = rcUL.top + std::ceil((rcUL.bottom - rcUL.top) / 2);
+				rcUL.bottom = rcUL.top + 1;
+				surface->FillRectangleAligned(rcUL, Fill(textFore));
+			}
+			// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 		} else if (horizontal.left > rcLine.right) {
 			break;
 		}

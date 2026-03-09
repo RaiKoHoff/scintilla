@@ -8,6 +8,10 @@
 #ifndef VIEWSTYLE_H
 #define VIEWSTYLE_H
 
+// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+#include "Scintilla.h"
+// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
+
 namespace Scintilla::Internal {
 
 /**
@@ -249,7 +253,7 @@ public:
 private:
 	void AllocStyles(size_t sizeNew);
 	void CreateAndAddFont(const FontSpecification &fs);
-	FontRealised *Find(const FontSpecification &fs);
+	FontRealised *Find(const FontSpecification &fs) const;
 	void FindMaxAscentDescent() noexcept;
 };
 

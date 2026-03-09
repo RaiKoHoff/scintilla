@@ -430,7 +430,10 @@ void ViewStyle::Refresh(Surface &surface, int tabInChars) {
 
 	aveCharWidth = styles[StyleDefault].aveCharWidth;
 	spaceWidth = styles[StyleDefault].spaceWidth;
-	tabWidth = spaceWidth * tabInChars;
+	// >>>>>>>>>>>>>>>   BEG NON STD SCI PATCH   >>>>>>>>>>>>>>>
+	//~tabWidth = spaceWidth * tabInChars;
+	tabWidth = aveCharWidth * tabInChars;
+	// <<<<<<<<<<<<<<<   END NON STD SCI PATCH   <<<<<<<<<<<<<<<
 
 	controlCharWidth = 0.0;
 	if (controlCharSymbol >= ' ') {
@@ -783,10 +786,10 @@ void ViewStyle::CreateAndAddFont(const FontSpecification &fs) {
 	}
 }
 
-FontRealised *ViewStyle::Find(const FontSpecification &fs) {
+FontRealised *ViewStyle::Find(const FontSpecification &fs) const {
 	if (!fs.fontName)	// Invalid specification so return arbitrary object
 		return fonts.begin()->second.get();
-	const FontMap::iterator it = fonts.find(fs);
+	const auto it = fonts.find(fs);
 	if (it != fonts.end()) {
 		// Should always reach here since map was just set for all styles
 		return it->second.get();
